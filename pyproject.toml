@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asnany-article-rag-production"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "beautifulsoup4>=4.14.3",
+    "fastapi>=0.129.0",
+    "groq>=1.0.0",
+    "python-dotenv>=1.2.1",
+    "qdrant-client>=1.16.2",
+    "requests>=2.32.5",
+    "sentence-transformers>=5.2.2",
+    "uvicorn>=0.40.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ai*"]

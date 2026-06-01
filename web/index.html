@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Asnany AI</title>
+
+<style>
+  body {
+    margin: 0;
+    background: #ffffff;
+    font-family: Arial, sans-serif;
+  }
+
+  /* Toggle Button */
+  #chat-toggle {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #72AC34;
+  border: none;
+
+  width: 80px;      /* Bigger */
+  height: 80px;     /* Bigger */
+
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 1000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+}
+
+  /* Widget */
+  #chat-widget {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    width: 360px;
+    height: 500px;
+    max-height: 85vh;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 1000;
+    direction: rtl;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  /* Header */
+  .chat-header {
+    background: #72AC34;
+    color: #ffffff;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  #chat-close {
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    font-size: 18px;
+    cursor: pointer;
+  }
+
+  /* Messages */
+  #chat-messages {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .message {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    max-width: 85%;
+    word-wrap: break-word;
+  }
+
+  .user {
+    background: #72AC34;
+    color: #ffffff;
+    align-self: flex-end;
+  }
+
+  .bot {
+    background: #f3f3f3;
+    color: #565656;
+    align-self: flex-start;
+  }
+
+  .message a {
+    color: #72AC34;
+    text-decoration: underline;
+  }
+
+  /* Typing indicator */
+  .typing {
+    display: inline-flex;
+    gap: 4px;
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    background: #565656;
+    border-radius: 50%;
+    animation: bounce 1.2s infinite ease-in-out;
+  }
+
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes bounce {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1); }
+  }
+
+  /* Form */
+  #chat-form {
+    display: flex;
+    border-top: 1px solid #eee;
+  }
+
+  #chat-input {
+    flex: 1;
+    border: none;
+    padding: 14px;
+    font-size: 14px;
+    outline: none;
+  }
+
+  #chat-form button {
+    background: #72AC34;
+    color: #ffffff;
+    border: none;
+    padding: 0 18px;
+    cursor: pointer;
+  }
+
+  #chat-toggle svg {
+  width: 70px;
+  height: 70px;
+  transform: translateY(5px);
+}
+
+#chat-toggle {
+  transition: all 0.2s ease;
+}
+
+#chat-toggle:hover {
+  transform: scale(1.08);
+}
+
+.user {
+  align-self: flex-start;
+}
+
+  /* ======================
+     MOBILE OPTIMIZATION
+  ====================== */
+  @media (max-width: 480px) {
+    #chat-widget {
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 100%;
+      max-height: 100%;
+      border-radius: 0;
+      direction: rtl;
+    }
+
+    #chat-toggle {
+      bottom: 15px;
+      right: 15px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<button id="chat-toggle">
+  <svg width="44" height="44" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+    
+    <!-- Antenna -->
+    <line x1="60" y1="18" x2="60" y2="32"
+          stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="60" cy="14" r="6"
+            stroke="#ffffff" stroke-width="6" fill="none"/>
+
+    <!-- Head -->
+    <rect x="30" y="32" width="60" height="52" rx="16"
+          stroke="#ffffff" stroke-width="6" fill="none"/>
+
+    <!-- Side Ears -->
+    <rect x="20" y="48" width="12" height="20" rx="6"
+          stroke="#ffffff" stroke-width="6" fill="none"/>
+    <rect x="88" y="48" width="12" height="20" rx="6"
+          stroke="#ffffff" stroke-width="6" fill="none"/>
+
+    <!-- Eyes -->
+    <circle cx="50" cy="58" r="5" fill="#ffffff"/>
+    <circle cx="70" cy="58" r="5" fill="#ffffff"/>
+
+    <!-- Mouth -->
+    <line x1="52" y1="72" x2="68" y2="72"
+          stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+  </svg>
+</button>
+
+<div id="chat-widget" class="hidden">
+  <div class="chat-header">
+    <span>المساعد الذكي</span>
+    <button id="chat-close">✕</button>
+  </div>
+
+  <!-- CHECKING SCREEN -->
+  <div id="checking-screen" class="hidden" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+    <div class="typing">
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+    <p style="margin-top:20px;color:#565656;">جارٍ التحقق من حالة الخدمة...</p>
+  </div>
+
+  <!-- OFFLINE -->
+  <div id="server-status" class="hidden" style="padding:20px;text-align:center;color:#565656;">
+    <h3 style="margin-top:40px;">الخدمة غير متاحة حالياً</h3>
+    <p>ستعود الخدمة بعد قليل 🚀</p>
+  </div>
+
+  <!-- CHAT -->
+  <div id="chat-messages" class="hidden"></div>
+
+  <form id="chat-form" class="hidden">
+    <input type="text" id="chat-input" placeholder="اكتب سؤالك..." />
+    <button type="submit">إرسال</button>
+  </form>
+</div>
+
+<script>
+const toggleBtn = document.getElementById("chat-toggle");
+const closeBtn = document.getElementById("chat-close");
+const widget = document.getElementById("chat-widget");
+const form = document.getElementById("chat-form");
+const input = document.getElementById("chat-input");
+const messages = document.getElementById("chat-messages");
+
+toggleBtn.addEventListener("click", async () => {
+  widget.classList.toggle("hidden");
+
+  if (!widget.classList.contains("hidden")) {
+
+    setCheckingMode();
+
+    const startTime = Date.now();
+
+    const result = await checkServerHealth(); // returns "online" or "offline"
+
+    const elapsed = Date.now() - startTime;
+    const remaining = 2000 - elapsed; // 2 seconds minimum
+
+    if (remaining > 0) {
+      await new Promise(resolve => setTimeout(resolve, remaining));
+    }
+
+    if (result === "online") {
+      setOnlineMode();
+    } else {
+      setOfflineMode();
+    }
+  }
+});
+
+closeBtn.addEventListener("click", () => {
+  widget.classList.add("hidden");
+});
+
+setInterval(() => {
+  if (!widget.classList.contains("hidden")) {
+    checkServerHealth();
+  }
+}, 30000);
+
+const API_BASE = "https://api.alahliadental.com";
+let serverOnline = false;
+
+let widgetState = "checking";
+
+function setCheckingMode() {
+  widgetState = "checking";
+
+  document.getElementById("checking-screen").classList.remove("hidden");
+  document.getElementById("server-status").classList.add("hidden");
+  messages.classList.add("hidden");
+  form.classList.add("hidden");
+}
+
+function setOnlineMode() {
+  widgetState = "online";
+  serverOnline = true;
+
+  document.getElementById("checking-screen").classList.add("hidden");
+  document.getElementById("server-status").classList.add("hidden");
+  messages.classList.remove("hidden");
+  form.classList.remove("hidden");
+}
+
+function setOfflineMode() {
+  widgetState = "offline";
+  serverOnline = false;
+
+  document.getElementById("checking-screen").classList.add("hidden");
+  document.getElementById("server-status").classList.remove("hidden");
+  messages.classList.add("hidden");
+  form.classList.add("hidden");
+}
+
+async function checkServerHealth() {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+
+    const res = await fetch(`${API_BASE}/health`, {
+      method: "GET",
+      signal: controller.signal,
+      cache: "no-store"
+    });
+
+    clearTimeout(timeout);
+
+    if (!res.ok) throw new Error();
+
+    const data = await res.json();
+
+    if (data.status === "ok") {
+      return "online";
+    }
+
+    return "offline";
+
+  } catch {
+    return "offline";
+  }
+}
+
+function addMessage(text, type) {
+  const div = document.createElement("div");
+  div.className = `message ${type}`;
+  div.textContent = text;
+
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+
+  return div;
+}
+
+/* Typing Animation */
+function showTyping() {
+  const div = document.createElement("div");
+  div.className = "message bot";
+  div.id = "typing-indicator";
+  div.innerHTML = `
+    <div class="typing">
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+  `;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function removeTyping() {
+  const typing = document.getElementById("typing-indicator");
+  if (typing) typing.remove();
+}
+
+function typeWriter(text, sources = []) {
+  const div = document.createElement("div");
+  div.className = "message bot";
+  messages.appendChild(div);
+
+  let i = 0;
+
+  function typeChar() {
+    if (i < text.length) {
+      div.textContent += text.charAt(i);
+      i++;
+      messages.scrollTop = messages.scrollHeight;
+      setTimeout(typeChar, 15);
+    } else {
+      if (sources.length > 0) {
+        typeSources(div, sources);
+      }
+    }
+  }
+
+  typeChar();
+}
+
+
+function typeSources(parentDiv, sources) {
+  let index = 0;
+
+  parentDiv.appendChild(document.createElement("br"));
+
+  const header = document.createElement("div");
+  header.style.fontWeight = "bold";
+  header.style.marginTop = "8px";
+  parentDiv.appendChild(header);
+
+  const headerText = "للمزيد:";
+  let j = 0;
+
+  function typeHeader() {
+    if (j < headerText.length) {
+      header.textContent += headerText.charAt(j);
+      j++;
+      messages.scrollTop = messages.scrollHeight;
+      setTimeout(typeHeader, 20);
+    } else {
+      typeNextSource();
+    }
+  }
+
+  function typeNextSource() {
+    if (index >= sources.length) return;
+
+    const src = sources[index];
+
+    const line = document.createElement("div");
+    line.style.marginTop = "4px";
+    parentDiv.appendChild(line);
+
+    let k = 0;
+    const text = "🔗 " + src.title;
+
+    function typeLinkText() {
+      if (k < text.length) {
+        line.textContent += text.charAt(k);
+        k++;
+        messages.scrollTop = messages.scrollHeight;
+        setTimeout(typeLinkText, 15);
+      } else {
+        // بعد ما النص يخلص يتحول لـ link
+        const link = document.createElement("a");
+        link.href = src.url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = text;
+
+        link.style.display = "block";
+        link.style.color = "#72AC34";
+        link.style.textDecoration = "none";
+        link.style.marginTop = "4px";
+
+        link.style.opacity = "0";
+        link.style.transition = "opacity 0.2s ease";
+
+        parentDiv.replaceChild(link, line);
+
+        setTimeout(() => {
+        link.style.opacity = "1";
+      }, 10);
+
+        index++;
+        typeNextSource();
+      }
+    }
+
+    typeLinkText();
+  }
+
+  typeHeader();
+}
+
+form.addEventListener("submit", async (e) => {
+
+  if (!serverOnline) {
+    addMessage("الخدمة غير متاحة حالياً.", "bot");
+    return;
+  }
+
+  e.preventDefault();
+
+  const query = input.value.trim();
+  if (!query) return;
+
+  addMessage(query, "user");
+  input.value = "";
+
+  showTyping();
+
+  try {
+    const API_BASE = "https://api.alahliadental.com";
+
+    const res = await fetch(`${API_BASE}/chat/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    });
+
+    let data = await res.json();
+
+    removeTyping();
+
+    if (!res.ok) {
+      typeWriter(data?.detail ?? "Server error");
+      return;
+    }
+
+    typeWriter(
+      data.reply ?? "No response.",
+      data.sources || []
+    );
+
+  } catch (err) {
+    removeTyping();
+    typeWriter("Connection error. Try again.");
+  }
+});
+</script>
+
+</body>
+</html>
