@@ -299,7 +299,12 @@ setInterval(() => {
   }
 }, 30000);
 
-const API_BASE = "https://api.alahliadental.com";
+const isLocalhost = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost";
+
+// عدلنا البورت هنا إلى 8000 وشيلنا الـ Slash الزيادة في الآخر
+const API_BASE = isLocalhost 
+  ? "http://127.0.0.1:8000" 
+  : "https://api.alahliadental.com";
 let serverOnline = false;
 
 let widgetState = "checking";
@@ -510,7 +515,6 @@ form.addEventListener("submit", async (e) => {
   showTyping();
 
   try {
-    const API_BASE = "https://api.alahliadental.com";
 
     const res = await fetch(`${API_BASE}/chat/`, {
       method: "POST",
