@@ -17,15 +17,15 @@
   position: fixed;
   bottom: 20px;
   right: 20px;
-  background: #72AC34;
+  background-color: #72AC34;
   border: none;
 
-  width: 80px;      /* Bigger */
-  height: 80px;     /* Bigger */
+  width: 80px;
+  height: 80px;
 
   border-radius: 50%;
   cursor: pointer;
-  z-index: 1000;
+  z-index: 999999 !important;
 
   display: flex;
   align-items: center;
@@ -33,6 +33,13 @@
 
   padding: 0;
   box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+
+  background-image: url("data:image/svg+xml;utf8,<svg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'><line x1='60' y1='18' x2='60' y2='32' stroke='white' stroke-width='6' stroke-linecap='round'/><circle cx='60' cy='14' r='6' stroke='white' stroke-width='6' fill='none'/><rect x='30' y='32' width='60' height='52' rx='16' stroke='white' stroke-width='6' fill='none'/><rect x='20' y='48' width='12' height='20' rx='6' stroke='white' stroke-width='6' fill='none'/><rect x='88' y='48' width='12' height='20' rx='6' stroke='white' stroke-width='6' fill='none'/><circle cx='50' cy='58' r='5' fill='white'/><circle cx='70' cy='58' r='5' fill='white'/><line x1='52' y1='72' x2='68' y2='72' stroke='white' stroke-width='6' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 70px 70px;
+
+  transition: all 0.2s ease;
 }
 
   /* Widget */
@@ -49,8 +56,13 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    z-index: 1000;
+    z-index: 999998 !important;
     direction: rtl;
+    transition: bottom 0.25s ease;
+  }
+
+  #chat-widget.chat-open {
+    bottom: 20px;
   }
 
   .hidden {
@@ -154,18 +166,18 @@
     cursor: pointer;
   }
 
-  #chat-toggle svg {
-  width: 70px;
-  height: 70px;
-  transform: translateY(5px);
-}
-
 #chat-toggle {
-  transition: all 0.2s ease;
+  transition: transform 0.25s ease, opacity 0.25s ease;
 }
 
 #chat-toggle:hover {
   transform: scale(1.08);
+}
+
+#chat-toggle.chat-open {
+  transform: scale(0);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .user {
@@ -195,34 +207,7 @@
 </head>
 <body>
 
-<button id="chat-toggle">
-  <svg width="44" height="44" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-    
-    <!-- Antenna -->
-    <line x1="60" y1="18" x2="60" y2="32"
-          stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
-    <circle cx="60" cy="14" r="6"
-            stroke="#ffffff" stroke-width="6" fill="none"/>
-
-    <!-- Head -->
-    <rect x="30" y="32" width="60" height="52" rx="16"
-          stroke="#ffffff" stroke-width="6" fill="none"/>
-
-    <!-- Side Ears -->
-    <rect x="20" y="48" width="12" height="20" rx="6"
-          stroke="#ffffff" stroke-width="6" fill="none"/>
-    <rect x="88" y="48" width="12" height="20" rx="6"
-          stroke="#ffffff" stroke-width="6" fill="none"/>
-
-    <!-- Eyes -->
-    <circle cx="50" cy="58" r="5" fill="#ffffff"/>
-    <circle cx="70" cy="58" r="5" fill="#ffffff"/>
-
-    <!-- Mouth -->
-    <line x1="52" y1="72" x2="68" y2="72"
-          stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
-  </svg>
-</button>
+<button id="chat-toggle" type="button" onclick="toggleAsnanyChat()" aria-label="فتح المساعد الذكي"></button>
 
 <div id="chat-widget" class="hidden">
   <div class="chat-header">
@@ -263,19 +248,28 @@ const form = document.getElementById("chat-form");
 const input = document.getElementById("chat-input");
 const messages = document.getElementById("chat-messages");
 
-toggleBtn.addEventListener("click", async () => {
+async function toggleAsnanyChat() {
+  const widget = document.getElementById("chat-widget");
+  const toggleBtn = document.getElementById("chat-toggle");
+
+  const isHidden = widget.classList.contains("hidden");
   widget.classList.toggle("hidden");
 
-  if (!widget.classList.contains("hidden")) {
+  if (isHidden) {
+    // إخفاء الزرار بـ animation لما الشات يفتح
+    toggleBtn.classList.add("chat-open");
+    setTimeout(() => { toggleBtn.style.display = "none"; }, 250);
+
+    // تنزيل القايمة لتملأ المساحة
+    widget.classList.add("chat-open");
 
     setCheckingMode();
 
     const startTime = Date.now();
-
-    const result = await checkServerHealth(); // returns "online" or "offline"
+    const result = await checkServerHealth();
 
     const elapsed = Date.now() - startTime;
-    const remaining = 2000 - elapsed; // 2 seconds minimum
+    const remaining = 2000 - elapsed;
 
     if (remaining > 0) {
       await new Promise(resolve => setTimeout(resolve, remaining));
@@ -287,10 +281,27 @@ toggleBtn.addEventListener("click", async () => {
       setOfflineMode();
     }
   }
-});
+}
 
-closeBtn.addEventListener("click", () => {
-  widget.classList.add("hidden");
+document.addEventListener("DOMContentLoaded", function () {
+  const closeBtn = document.getElementById("chat-close");
+  const widget = document.getElementById("chat-widget");
+
+  if (closeBtn && widget) {
+    closeBtn.addEventListener("click", function () {
+      widget.classList.add("hidden");
+      widget.classList.remove("chat-open");
+
+      // إرجاع الزرار بـ animation لما الشات يتقفل
+      const toggleBtn = document.getElementById("chat-toggle");
+      toggleBtn.style.display = "flex";
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          toggleBtn.classList.remove("chat-open");
+        });
+      });
+    });
+  }
 });
 
 setInterval(() => {
@@ -299,12 +310,7 @@ setInterval(() => {
   }
 }, 30000);
 
-const isLocalhost = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost";
-
-// عدلنا البورت هنا إلى 8000 وشيلنا الـ Slash الزيادة في الآخر
-const API_BASE = isLocalhost 
-  ? "http://127.0.0.1:8000" 
-  : "https://api.alahliadental.com";
+const API_BASE = "https://blog-chat.alahliadental.com";
 let serverOnline = false;
 
 let widgetState = "checking";
