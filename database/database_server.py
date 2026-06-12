@@ -129,49 +129,54 @@ def export_blog_to_csv(csv_path: Path = CSV_PATH) -> int:
 
 def seed_blog_from_csv(csv_path: Path = CSV_PATH) -> None:
     """
-    Legacy helper: bulk-import articles from CSV into MySQL.
-    Uses INSERT IGNORE to skip duplicates.
-    Normalizes URLs before insert so all rows are canonical.
+    Legacy helper: import articles from CSV into MySQL.
+    Safe/idempotent using normalized URL comparison against DB before insert.
+
     Do NOT call this in the production pipeline — it exists for migration only.
     """
     csv_path = Path(csv_path)
     if not csv_path.exists():
         raise FileNotFoundError(f"❌ CSV not found: {csv_path}")
 
+    known_urls = load_known_urls_from_db()
+
+    inserted = 0
+    skipped = 0
+    invalid = 0
+
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        rows = []
+
         for row in reader:
             title = (row.get("title") or "").strip()
             raw_url = (row.get("url") or "").strip()
             url = normalize_url(raw_url)
             content = (row.get("content") or "").strip()
-            if title and url and content:
-                rows.append({"title": title, "url": url, "content": content})
 
-    if not rows:
-        print("⚠️ No valid rows found in CSV — nothing to seed")
-        return
+            if not title or not url or not content:
+                invalid += 1
+                continue
 
-    conn = get_connection()
-    try:
-        create_blog_table(conn)
-        inserted = 0
-        with conn.cursor() as cursor:
-            for row in rows:
-                cursor.execute(
-                    "INSERT IGNORE INTO blog (title, url, content) VALUES (%s, %s, %s);",
-                    (row["title"], row["url"], row["content"]),
-                )
-                if cursor.rowcount > 0:
-                    inserted += 1
-        conn.commit()
-        print(f"🌱 Seeded {inserted} new articles (skipped {len(rows) - inserted} duplicates)")
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+            if url in known_urls:
+                skipped += 1
+                continue
+
+            was_inserted = insert_blog_article({
+                "title": title,
+                "url": url,
+                "content": content,
+            })
+
+            if was_inserted:
+                inserted += 1
+                known_urls.add(url)
+            else:
+                skipped += 1
+
+    print(
+        f"🌱 Seeded {inserted} new articles "
+        f"(skipped {skipped} duplicates, invalid {invalid})"
+    )
 
 
 # ======================
