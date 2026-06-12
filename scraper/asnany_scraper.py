@@ -1,8 +1,8 @@
 import csv
 import time
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Set, Union
-from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
+from typing import Callable, Dict, Iterable, List, Optional, Set, Union
+from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode, unquote, quote
 
 import requests
 from bs4 import BeautifulSoup
@@ -40,6 +40,7 @@ def normalize_url(raw_url: str) -> str:
     """
     Normalize URLs so we don't treat trivial variants as different articles.
     - Lowercase scheme+host
+    - Decode percent-encoding then re-encode canonically (fixes %D9 vs %d9 mismatch)
     - Remove fragments (#...)
     - Drop tracking query params (utm_*, fbclid, gclid, ...)
     - Normalize trailing slash (keep '/' only for root)
@@ -56,7 +57,11 @@ def normalize_url(raw_url: str) -> str:
     scheme = (p.scheme or "https").lower()
     netloc = (p.netloc or "").lower()
 
+    # Decode percent-encoding fully, then re-encode with lowercase hex.
+    # This normalizes %D9%8A == %d9%8a == ي so any variant compares equal.
+    # safe='/' preserves path separators; other reserved chars stay encoded.
     path = p.path or "/"
+    path = quote(unquote(path), safe="/:@!$&'()*+,;=")
     if path != "/" and path.endswith("/"):
         path = path.rstrip("/")
 
@@ -100,8 +105,9 @@ def ensure_csv_ready(csv_path: Union[str, Path]) -> Path:
 
 def load_known_urls_from_csv(csv_path: Union[str, Path]) -> Set[str]:
     """
-    Optional helper if you want to run this file standalone.
-    Main.py can also do this, but having it here is convenient.
+    Legacy CSV-based known URL loader.
+    Kept for standalone/backwards-compatible use.
+    Production pipeline uses load_known_urls_from_db() instead.
     """
     csv_path = Path(csv_path)
     if not csv_path.exists() or csv_path.stat().st_size == 0:
@@ -211,18 +217,25 @@ def scrape_all_articles(
     csv_path: Union[str, Path] = DEFAULT_OUTPUT_CSV,
     total_pages: int = TOTAL_PAGES,
     sleep_seconds: float = 0.3,
+    on_article: Optional[Callable[[Dict[str, str]], None]] = None,
+    write_csv: bool = True,
 ) -> int:
     """
     Incremental scraping:
-    - known_urls: URLs already scraped (normalized). Any new URL will be scraped and appended to CSV.
-    - csv_path: CSV destination
+    - known_urls: URLs already scraped (normalized). Any new URL will be scraped.
+    - csv_path: CSV destination (used only when write_csv=True)
     - total_pages: 0 means "until pages end", else scrape 1..total_pages
-    - Returns number of NEW articles appended.
+    - on_article: optional callback called with the article dict after scraping.
+                  Production pipeline passes insert_blog_article here.
+    - write_csv: if True, appends each new article to CSV (legacy/standalone mode).
+                 Set to False in production pipeline (MySQL is the source of truth).
+    - Returns number of newly processed articles.
     """
     if known_urls is None:
         known_urls = set()
 
-    csv_path = ensure_csv_ready(csv_path)
+    if write_csv:
+        csv_path = ensure_csv_ready(csv_path)
 
     new_count = 0
     page = 1
@@ -260,11 +273,16 @@ def scrape_all_articles(
                 print(f"   → Scraping {link}")
                 article = scrape_article(link)
 
-                # store the normalized URL in known_urls to avoid duplicates in same run
+                # Store the normalized URL in known_urls to avoid duplicates in same run
                 known_urls.add(norm)
 
-                # write immediately (incremental)
-                append_article_to_csv(csv_path, article)
+                # Write to CSV if enabled (legacy/standalone mode)
+                if write_csv:
+                    append_article_to_csv(csv_path, article)
+
+                # Call the on_article callback if provided (production: insert_blog_article)
+                if on_article is not None:
+                    on_article(article)
 
                 new_count += 1
                 time.sleep(sleep_seconds)
@@ -274,7 +292,7 @@ def scrape_all_articles(
 
         page += 1
 
-    print(f"\n✅ New articles appended: {new_count}")
+    print(f"\n✅ New articles processed: {new_count}")
     return new_count
 
 
@@ -286,4 +304,4 @@ if __name__ == "__main__":
     existing = load_known_urls_from_csv(csv_path)
     print(f"📄 Known URLs in CSV: {len(existing)}")
 
-    scrape_all_articles(existing, csv_path=csv_path)
+    scrape_all_articles(existing, csv_path=csv_path, write_csv=True)

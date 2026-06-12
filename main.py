@@ -1,17 +1,17 @@
 from pathlib import Path
 import os
-import sqlite3
 
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 
-from scraper.asnany_scraper import (
-    scrape_all_articles,
-    load_known_urls_from_csv,
-)
+from scraper.asnany_scraper import scrape_all_articles
 
+from database.db import get_connection
+from database.tables.blog import create_blog_table
 from database.database_server import (
-    seed_blog_from_csv,
+    load_known_urls_from_db,
+    insert_blog_article,
+    export_blog_to_csv,
     embed_and_upload_blog_articles,
 )
 
@@ -30,20 +30,19 @@ QDRANT_TIMEOUT = int(os.getenv("QDRANT_TIMEOUT", 120))
 # ======================
 PROJECT_ROOT = Path(__file__).resolve().parent
 CSV_PATH = PROJECT_ROOT / "scraper" / "articles.csv"
-DB_PATH = PROJECT_ROOT / "database" / "database.db"
 
 
 def reset_all_is_embedded() -> None:
-    """Reset embedding state so we can rebuild Qdrant from SQL."""
-    if not DB_PATH.exists():
-        # لو الداتابيس مش موجودة لسه، seeding هو اللي هيعملها
-        return
-
-    conn = sqlite3.connect(DB_PATH)
+    """Reset embedding state so we can rebuild Qdrant from MySQL."""
+    conn = get_connection()
     try:
-        conn.execute("UPDATE blog SET is_embedded = 0;")
+        with conn.cursor() as cursor:
+            cursor.execute("UPDATE blog SET is_embedded = 0;")
         conn.commit()
         print("🔄 Reset is_embedded=0 for all articles (rebuild mode)")
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
@@ -52,25 +51,31 @@ def reset_all_is_embedded() -> None:
 # Main
 # ======================
 if __name__ == "__main__":
-    # 1️⃣ جهّز known_urls من CSV (لو مش موجود هترجع set فاضية)
-    known_urls = load_known_urls_from_csv(CSV_PATH)
+    # 1️⃣ Ensure MySQL table exists and load known URLs from DB
+    conn = get_connection()
+    try:
+        create_blog_table(conn)
+    finally:
+        conn.close()
 
-    if CSV_PATH.exists():
-        print(f"📄 articles.csv found — known URLs: {len(known_urls)}")
-    else:
-        print("📄 articles.csv not found — will create and scrape...")
+    known_urls = load_known_urls_from_db()
+    print(f"🗄️ Known URLs in MySQL: {len(known_urls)}")
 
-    # 2️⃣ Scrape incremental (هيضيف الجديد فقط للـ CSV)
+    # 2️⃣ Scrape incremental — write directly to MySQL, skip CSV write
     scrape_all_articles(
         known_urls,
         csv_path=CSV_PATH,
+        total_pages=0,
+        sleep_seconds=0.3,
+        on_article=insert_blog_article,
+        write_csv=False,
     )
 
-    # 3️⃣ SQL / Seeding (بعد ما CSV اتحدّث)
-    print("\n🗄️ Starting SQL seeding from CSV...")
-    seed_blog_from_csv()
+    # 3️⃣ Export CSV backup from MySQL
+    print("\n📄 Exporting CSV backup from MySQL...")
+    export_blog_to_csv(CSV_PATH)
 
-    # 4️⃣ Qdrant reset logic (لو الـ collection مش موجودة)
+    # 4️⃣ Qdrant reset logic (if collection is missing)
     if not QDRANT_URL:
         raise RuntimeError("QDRANT_URL is not set in .env")
 
