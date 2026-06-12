@@ -23,6 +23,3 @@ scraper/articles.csv
 
 # HuggingFace model cache
 .cache/
-
-# Generated frontend config (built from .env by scripts/generate_frontend_config.py)
-web/config.js

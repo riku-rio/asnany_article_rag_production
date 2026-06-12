@@ -240,7 +240,6 @@
   </form>
 </div>
 
-<script src="./config.js"></script>
 <script>
 const toggleBtn = document.getElementById("chat-toggle");
 const closeBtn = document.getElementById("chat-close");
@@ -311,7 +310,10 @@ setInterval(() => {
   }
 }, 30000);
 
-const API_BASE = window.ASNANY_CONFIG?.API_BASE || "http://localhost:8000";
+const API_BASE =
+  ["localhost", "127.0.0.1"].includes(window.location.hostname)
+    ? "http://localhost:8000"
+    : "https://blog-chat.alahliadental.com";
 let serverOnline = false;
 
 let widgetState = "checking";
