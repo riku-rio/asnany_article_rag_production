@@ -310,7 +310,10 @@ setInterval(() => {
   }
 }, 30000);
 
-const API_BASE = "https://blog-chat.alahliadental.com";
+const API_BASE =
+  ["localhost", "127.0.0.1"].includes(window.location.hostname)
+    ? "http://localhost:8000"
+    : "https://blog-chat.alahliadental.com";
 let serverOnline = false;
 
 let widgetState = "checking";

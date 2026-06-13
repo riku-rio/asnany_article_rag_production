@@ -1,30 +1,14 @@
-import sqlite3
-from typing import List , Dict
-from pathlib import Path
+from typing import Dict, List
+
+from database.db import get_connection
 
 # ======================
-# Paths
-# ======================
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DB_PATH = PROJECT_ROOT / "database" / "database.db"
-
-# ======================
-# Connection
-# ======================
-
-def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-# ======================
-# Fetch Structured Sources (NEW - V3 Ready)
+# Fetch Structured Sources (MySQL version)
 # ======================
 
 def fetch_sources_by_ids(article_ids: List[int]) -> List[Dict[str, str]]:
     """
-    Fetch blog title + url by article IDs.
+    Fetch blog title + url by article IDs from MySQL.
 
     Returns:
         [
@@ -52,7 +36,7 @@ def fetch_sources_by_ids(article_ids: List[int]) -> List[Dict[str, str]]:
     if not clean_ids:
         return []
 
-    placeholders = ",".join("?" for _ in clean_ids)
+    placeholders = ",".join("%s" for _ in clean_ids)
 
     query = f"""
         SELECT id, title, url
@@ -63,7 +47,9 @@ def fetch_sources_by_ids(article_ids: List[int]) -> List[Dict[str, str]]:
     conn = get_connection()
 
     try:
-        rows = conn.execute(query, clean_ids).fetchall()
+        with conn.cursor() as cursor:
+            cursor.execute(query, clean_ids)
+            rows = cursor.fetchall()
 
         # Map id -> {title, url}
         source_map = {

@@ -1,17 +1,10 @@
 import os
-import sqlite3
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Iterable
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 
-# ======================
-# Paths
-# ======================
-
-BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "database.db"
+from database.db import get_connection
 
 # =========================
 # Load ENV
@@ -48,16 +41,6 @@ def get_model() -> SentenceTransformer:
 
 
 # =========================
-# DB Helper
-# =========================
-
-def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-# =========================
 # Chunking
 # =========================
 
@@ -91,17 +74,21 @@ def chunk_text(
     return chunks
 
 
-def _iter_unembedded_articles(conn: sqlite3.Connection) -> Iterable[sqlite3.Row]:
-    return conn.execute(
-        """
-        SELECT
-            id,
-            title,
-            content
-        FROM blog
-        WHERE is_embedded = 0;
-        """
-    )
+def _iter_unembedded_articles(conn) -> List[Dict[str, Any]]:
+    """
+    Fetch all articles where is_embedded = 0 from MySQL.
+    Returns a list of dicts with keys: id, title, content.
+    """
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, title, content
+            FROM blog
+            WHERE is_embedded = 0
+            ORDER BY id ASC;
+            """
+        )
+        return cursor.fetchall()
 
 
 # =========================
@@ -110,7 +97,7 @@ def _iter_unembedded_articles(conn: sqlite3.Connection) -> Iterable[sqlite3.Row]
 
 def embed_blog_articles() -> List[Dict[str, Any]]:
     """
-    Incremental embedder (Version 1):
+    Incremental embedder:
     - Reads ONLY articles where is_embedded = 0
     - Chunks content
     - Creates E5-compatible passage embeddings
@@ -126,7 +113,7 @@ def embed_blog_articles() -> List[Dict[str, Any]]:
     conn = get_connection()
 
     try:
-        rows = list(_iter_unembedded_articles(conn))
+        rows = _iter_unembedded_articles(conn)
 
         if not rows:
             print("⚠️ No new (unembedded) blog articles found")
@@ -150,7 +137,7 @@ def embed_blog_articles() -> List[Dict[str, Any]]:
 
             chunks = chunk_text(content)
 
-            # لو المحتوى قصير جدًا أو chunking رجع فاضي
+            # If content is too short or chunking returned empty
             if not chunks:
                 skipped_empty += 1
                 continue
@@ -184,7 +171,7 @@ def embed_blog_articles() -> List[Dict[str, Any]]:
                     "payload": {
                         "blog_id": blog_id,
                         "chunk_index": chunk_index,
-                        "chunk_text": chunk_body
+                        "chunk_text": chunk_body,
                     },
                 }
             )
