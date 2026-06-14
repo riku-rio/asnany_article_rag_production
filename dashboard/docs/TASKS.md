@@ -257,11 +257,11 @@ Verify delete workflow.
 
 Milestone 0 is complete when:
 
-* [ ] dashboard directory exists
-* [ ] index.html exists
-* [ ] Existing endpoints documented
-* [ ] Existing database documented
-* [ ] Reusable services identified
+* [x] dashboard directory exists
+* [x] index.html exists
+* [x] Existing endpoints documented
+* [x] Existing database documented
+* [x] Reusable services identified
 
 ---
 

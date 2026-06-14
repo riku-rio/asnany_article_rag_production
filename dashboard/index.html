@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f5f6f8; color: #1c1c1c; }
+  a { color: inherit; text-decoration: none; }
+
+  .app { display: flex; flex-direction: column; height: 100vh; }
+
+  .header { display: flex; align-items: center; justify-content: space-between; height: 52px; padding: 0 24px; background: #fff; border-bottom: 1px solid #e0e0e0; flex-shrink: 0; }
+  .header-title { font-size: 16px; font-weight: 600; color: #1a1a2e; }
+  .header-status { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #4caf50; }
+  .header-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4caf50; }
+
+  .body { display: flex; flex: 1; overflow: hidden; }
+
+  .sidebar { width: 220px; background: #fff; border-right: 1px solid #e0e0e0; padding: 12px 0; flex-shrink: 0; overflow-y: auto; }
+  .sidebar-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; font-size: 14px; color: #555; cursor: pointer; transition: background 0.15s, color 0.15s; border: none; background: none; width: 100%; text-align: left; }
+  .sidebar-item:hover { background: #f0f1f4; color: #1a1a2e; }
+  .sidebar-item.active { background: #eef1ff; color: #3a56e4; font-weight: 500; }
+  .sidebar-icon { font-size: 18px; width: 22px; text-align: center; flex-shrink: 0; }
+
+  .content { flex: 1; padding: 28px 32px; overflow-y: auto; background: #f5f6f8; }
+  .section { display: none; }
+  .section.active { display: block; }
+  .section-title { font-size: 22px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px; }
+  .section-desc { font-size: 14px; color: #888; margin-bottom: 24px; }
+
+  .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; }
+  .card + .card { margin-top: 16px; }
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .kpi-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; }
+  .kpi-label { font-size: 13px; color: #888; margin-bottom: 4px; }
+  .kpi-value { font-size: 28px; font-weight: 600; color: #1a1a2e; }
+
+  .placeholder-text { color: #aaa; font-size: 14px; text-align: center; padding: 48px 0; }
+
+  @media (max-width: 700px) {
+    .sidebar { width: 56px; }
+    .sidebar-item span:not(.sidebar-icon) { display: none; }
+    .sidebar-item { justify-content: center; padding: 12px; }
+    .content { padding: 20px 16px; }
+    .kpi-row { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="header-title">RAG Dashboard</div>
+    <div class="header-status">
+      <span class="header-status-dot"></span>
+      Online
+    </div>
+  </header>
+
+  <div class="body">
+    <nav class="sidebar" id="sidebar">
+      <button class="sidebar-item active" data-tab="overview">
+        <span class="sidebar-icon">&#9632;</span>
+        <span>Overview</span>
+      </button>
+      <button class="sidebar-item" data-tab="knowledge">
+        <span class="sidebar-icon">&#9776;</span>
+        <span>Knowledge</span>
+      </button>
+      <button class="sidebar-item" data-tab="scraper">
+        <span class="sidebar-icon">&#8595;</span>
+        <span>Scraper</span>
+      </button>
+      <button class="sidebar-item" data-tab="embedding">
+        <span class="sidebar-icon">&#9851;</span>
+        <span>Embedding</span>
+      </button>
+      <button class="sidebar-item" data-tab="chat-test">
+        <span class="sidebar-icon">&#9993;</span>
+        <span>Chat Test</span>
+      </button>
+      <button class="sidebar-item" data-tab="logs">
+        <span class="sidebar-icon">&#9776;</span>
+        <span>Logs</span>
+      </button>
+      <button class="sidebar-item" data-tab="health">
+        <span class="sidebar-icon">&#10003;</span>
+        <span>Health</span>
+      </button>
+    </nav>
+
+    <main class="content" id="content">
+      <section class="section active" id="section-overview">
+        <h1 class="section-title">Overview</h1>
+        <p class="section-desc">System summary at a glance</p>
+        <div class="kpi-row">
+          <div class="kpi-card"><div class="kpi-label">Total Content</div><div class="kpi-value">--</div></div>
+          <div class="kpi-card"><div class="kpi-label">Embedded</div><div class="kpi-value">--</div></div>
+          <div class="kpi-card"><div class="kpi-label">Pending</div><div class="kpi-value">--</div></div>
+          <div class="kpi-card"><div class="kpi-label">Questions</div><div class="kpi-value">--</div></div>
+        </div>
+        <div class="card">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div><div style="font-size:13px;color:#888;">Last Scraping</div><div style="font-weight:500;margin-top:2px;">--</div></div>
+            <div><div style="font-size:13px;color:#888;">Last Embedding</div><div style="font-weight:500;margin-top:2px;">--</div></div>
+            <div><div style="font-size:13px;color:#888;">Database</div><div style="font-weight:500;margin-top:2px;">--</div></div>
+            <div><div style="font-size:13px;color:#888;">Qdrant</div><div style="font-weight:500;margin-top:2px;">--</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="section-knowledge">
+        <h1 class="section-title">Knowledge</h1>
+        <p class="section-desc">Browse and manage knowledge entries</p>
+        <div class="placeholder-text">Knowledge list will appear here</div>
+      </section>
+
+      <section class="section" id="section-scraper">
+        <h1 class="section-title">Scraper</h1>
+        <p class="section-desc">Trigger article scraping</p>
+        <div class="placeholder-text">Scraper controls will appear here</div>
+      </section>
+
+      <section class="section" id="section-embedding">
+        <h1 class="section-title">Embedding</h1>
+        <p class="section-desc">Manage vector indexing</p>
+        <div class="placeholder-text">Embedding controls will appear here</div>
+      </section>
+
+      <section class="section" id="section-chat-test">
+        <h1 class="section-title">Chat Test</h1>
+        <p class="section-desc">Test the AI chatbot</p>
+        <div class="placeholder-text">Chat test interface will appear here</div>
+      </section>
+
+      <section class="section" id="section-logs">
+        <h1 class="section-title">Logs</h1>
+        <p class="section-desc">System activity log</p>
+        <div class="placeholder-text">Log entries will appear here</div>
+      </section>
+
+      <section class="section" id="section-health">
+        <h1 class="section-title">Health</h1>
+        <p class="section-desc">System component status</p>
+        <div class="placeholder-text">Health status will appear here</div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+  (function() {
+    var sidebar = document.getElementById('sidebar');
+    var sections = {
+      overview: document.getElementById('section-overview'),
+      knowledge: document.getElementById('section-knowledge'),
+      scraper: document.getElementById('section-scraper'),
+      embedding: document.getElementById('section-embedding'),
+      'chat-test': document.getElementById('section-chat-test'),
+      logs: document.getElementById('section-logs'),
+      health: document.getElementById('section-health')
+    };
+
+    sidebar.addEventListener('click', function(e) {
+      var btn = e.target.closest('.sidebar-item');
+      if (!btn) return;
+
+      var tab = btn.getAttribute('data-tab');
+      if (!tab) return;
+
+      sidebar.querySelectorAll('.sidebar-item').forEach(function(item) {
+        item.classList.remove('active');
+      });
+      btn.classList.add('active');
+
+      Object.keys(sections).forEach(function(key) {
+        sections[key].classList.remove('active');
+      });
+      var target = sections[tab];
+      if (target) target.classList.add('active');
+    });
+  })();
+</script>
+</body>
+</html>
