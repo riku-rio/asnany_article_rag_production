@@ -26,20 +26,29 @@ End-to-end Retrieval-Augmented Generation (RAG) pipeline that scrapes Arabic den
 │       │                                                                     │
 │       ▼                                                                     │
 │  ┌─────────────┐    ┌──────────────┐    ┌───────────────┐    ┌───────────┐ │
-│  │  Scraper     │───▶│  SQLite Seed │───▶│  Embedder     │───▶│  Qdrant   │ │
+│  │  Scraper     │───▶│  MySQL       │───▶│  Embedder     │───▶│  Qdrant   │ │
 │  │  (asnany_   │    │  (database_  │    │  (sentence-   │    │  Uploader │ │
 │  │  scraper.py) │    │  server.py)  │    │  transformers) │    │  (batch)  │ │
 │  └─────────────┘    └──────────────┘    └───────────────┘    └───────────┘ │
 │       │                    │                      │                │        │
 │       ▼                    ▼                      ▼                ▼        │
-│  articles.csv         database.db           chunk + embed      Qdrant Cloud │
-│  (CSV output)         (SQLite store)        → passage: ...     (COSINE)    │
+│  articles.csv       MySQL (source of truth)   chunk + embed      Qdrant    │
+│  (CSV backup)       blog table                → passage: ...     Cloud     │
+│                     ┌────────────────────┐                   (COSINE)      │
+│                     │ id (PK, AUTO_INC)   │                                │
+│                     │ title VARCHAR(500)  │                                │
+│                     │ url VARCHAR(1000)   │                                │
+│                     │ content LONGTEXT    │                                │
+│                     │ is_embedded TINYINT │                                │
+│                     │ created_at TIMESTAMP│                                │
+│                     │ updated_at TIMESTAMP│                                │
+│                     └────────────────────┘                                │
 │                                                                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                           QUERY PIPELINE (run.py)                           │
 │                                                                             │
 │  ┌──────────┐    ┌────────────────┐    ┌──────────────┐    ┌────────────┐  │
-│  │  Chat     │───▶│  Qdrant        │───▶│  SQL Fetch   │───▶│  Groq LLM  │  │
+│  │  Chat     │───▶│  Qdrant        │───▶│  MySQL Fetch │───▶│  Groq LLM  │  │
 │  │  Widget   │    │  Retriever     │    │  (sources)   │    │  (answer)  │  │
 │  │  (RTL UI) │    │  (top-K=3)     │    │              │    │            │  │
 │  └──────────┘    └────────────────┘    └──────────────┘    └────────────┘  │
@@ -56,12 +65,13 @@ End-to-end Retrieval-Augmented Generation (RAG) pipeline that scrapes Arabic den
 | Component | Role |
 |-----------|------|
 | **Scraper** | Incrementally crawls the WordPress blog paginated listing, extracts article title/content, normalizes URLs, writes to CSV |
-| **SQLite Seed** | Reads CSV into a local SQLite database with `UNIQUE` url constraint for deduplication |
+| **MySQL Seed** | Reads CSV into a MySQL database with normalized URL deduplication (`INSERT IGNORE`) |
 | **Embedder** | Chunks article content (800 chars, 200 overlap), prepends `"passage: {title}"` for E5 compatibility, generates 1024-dim vectors via SentenceTransformer |
 | **Qdrant Uploader** | Creates a Qdrant collection with named vector `"embedding_text"` (COSINE distance), batch-upserts with deterministic UUIDv5 point IDs |
 | **Qdrant Retriever** | Encodes query with `"query: {text}"` prefix, searches Qdrant for top-K most similar chunks |
 | **Groq LLM** | Generates Arabic medical answers using `openai/gpt-oss-20b` with a strict system prompt |
 | **Chat Widget** | Arabic RTL frontend with typewriter animation, health checks, and source links |
+| **Utility Scripts** | MySQL import, deduplication, diagnostics, and connectivity test scripts |
 
 ---
 
@@ -77,8 +87,9 @@ End-to-end Retrieval-Augmented Generation (RAG) pipeline that scrapes Arabic den
 | Groq (SDK) | >=1.0.0 | LLM API client |
 | BeautifulSoup4 | >=4.14.3 | HTML parsing for scraping |
 | Requests | >=2.32.5 | HTTP client |
+| PyMySQL | >=1.2.0 | MySQL client for article source of truth |
 | python-dotenv | >=1.2.1 | Environment variable loading |
-| SQLite | (stdlib) | Metadata & source storage |
+| MySQL | >=8.0 | Primary article storage (source of truth) |
 | HuggingFace Hub | (via sentence-transformers) | Model hosting (`intfloat/multilingual-e5-large`) |
 
 ---
@@ -93,7 +104,7 @@ asnany_article_rag_production/
 ├── .python-version               # Pins Python to 3.10
 ├── pyproject.toml                # Project metadata + uv dependency declarations
 ├── uv.lock                       # Lockfile for deterministic uv installs
-├── main.py                       # Entry point: scrape → seed → embed → upload to Qdrant
+├── main.py                       # Entry point: scrape → MySQL → embed → upload to Qdrant
 ├── run.py                        # Entry point: start FastAPI server with uvicorn on port 8000
 ├── fastapi_embedding.py          # Standalone server with POST /run-embedding to trigger pipeline
 │
@@ -102,23 +113,29 @@ asnany_article_rag_production/
 │   │   └── system_prompt.txt     # Arabic system prompt for the LLM (medical answer generator)
 │   ├── chatbot/
 │   │   ├── qdrant_retriever.py   # Embeds query, searches Qdrant, returns relevant chunks
-│   │   ├── sql_fetch.py          # Fetches article title + URL from SQLite by blog_id
+│   │   ├── sql_fetch.py          # Fetches article title + URL from MySQL by blog_id
 │   │   └── reply.py              # Builds context, calls Groq API, returns answer + deduped sources
 │   └── endpoint/
 │       ├── chat.py               # FastAPI router: POST /chat/ validation, orchestration, logging
 │       └── fastapi.py            # FastAPI app factory: CORS, health check, mounts chat router
 │
 ├── database/                     # Data storage / embedding / upload
-│   ├── database.db               # SQLite database (created at runtime — gitignored)
-│   ├── database_server.py        # SQL seeding from CSV + per-article embedding pipeline
+│   ├── db.py                     # MySQL connection manager (PyMySQL, env-based config)
+│   ├── database_server.py        # MySQL seeding from CSV + per-article embedding pipeline
 │   ├── embedder.py               # Text chunking, SentenceTransformer embedding, Qdrant point prep
 │   ├── qdrant_uploader.py        # Collection creation, batch upsert, UUID normalization
 │   └── tables/
-│       └── blog.py               # SQLite DDL: CREATE TABLE blog (id, title, url UNIQUE, content, is_embedded)
+│       └── blog.py               # MySQL DDL: CREATE TABLE blog (id, title, url UNIQUE, content, is_embedded)
 │
 ├── scraper/                      # Web scraping
-│   ├── articles.csv              # Scraped data output (created at runtime — gitignored)
+│   ├── articles.csv              # Scraped data backup (exported from MySQL at runtime — gitignored)
 │   └── asnany_scraper.py         # WordPress scraper with URL normalization and incremental mode
+│
+├── scripts/                      # Utility scripts
+│   ├── import_csv_to_mysql.py    # One-time legacy CSV → MySQL import
+│   ├── test_mysql.py             # MySQL connectivity smoke test
+│   ├── check_duplicate_urls.py   # Diagnostic for duplicate normalized URLs in MySQL
+│   └── dedupe_mysql_blog_urls.py # Deduplicate tool (dry-run by default)
 │
 ├── web/
 │   └── index.html                # Chat widget frontend (Arabic RTL, typewriter effect, source links)
@@ -140,6 +157,7 @@ asnany_article_rag_production/
 - **Qdrant** — a cloud cluster (e.g., [Qdrant Cloud](https://cloud.qdrant.io)) or a local instance with URL + API token
 - **Groq API key** — obtain from [console.groq.com](https://console.groq.com)
 - **HuggingFace token** — required to download the gated model `intfloat/multilingual-e5-large`; get one at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+- **MySQL** >= 8.0 — the article source of truth. Connect via a local or cloud MySQL instance.
 
 ---
 
@@ -181,6 +199,7 @@ Edit `.env` with your actual credentials. Every variable is documented below:
 | `QDRANT_COLLECTION` | Qdrant collection name | No | `asnany_article_rag_production` |
 | `QDRANT_TIMEOUT` | Qdrant client timeout (seconds) | No | `300` |
 | `QDRANT_UPSERT_BATCH_SIZE` | Batch size for Qdrant upsert | No | `8` |
+| `QDRANT_ID_NAMESPACE` | UUIDv5 namespace for deterministic point IDs | No | `6ba7b811-9dad-11d1-80b4-00c04fd430c8` |
 | `HF_TOKEN` | HuggingFace token for gated model access | Yes | `hf_abc123...` |
 | `HF_MODEL` | SentenceTransformer embedding model | Yes | `intfloat/multilingual-e5-large` |
 | `EMBED_BATCH_SIZE` | Batch size for SentenceTransformer.encode | No | `64` |
@@ -189,22 +208,30 @@ Edit `.env` with your actual credentials. Every variable is documented below:
 | `RETRIEVER_TOP_K` | Number of chunks to retrieve from Qdrant | No | `3` |
 | `CHUNK_SIZE` | Character chunk size for text splitting | No | `800` |
 | `CHUNK_OVERLAP` | Character overlap between chunks | No | `200` |
+| `MYSQL_HOST` | MySQL server hostname | Yes | `localhost` |
+| `MYSQL_PORT` | MySQL server port | No | `3306` |
+| `MYSQL_USER` | MySQL username | Yes | `root` |
+| `MYSQL_PASSWORD` | MySQL password | Yes | `password` |
+| `MYSQL_DATABASE` | MySQL database name | Yes | `asnany_rag` |
+| `ENABLE_CHAT_LOGS` | Toggle chat interaction logging (JSONL) | No | `true` |
 
 ---
 
 ## Running the Project
 
-### Full data pipeline (scrape → seed → embed → upload)
+### Full data pipeline (scrape → MySQL → embed → upload)
 
 ```bash
 python main.py
 ```
 
-This runs four stages sequentially:
-1. Scrapes new articles from `blog.asnany.net` (incremental — skips known URLs)
-2. Seeds the SQLite database from `scraper/articles.csv`
-3. Checks if the Qdrant collection exists (if not, resets embedding state)
-4. Embeds only unembedded articles (`is_embedded = 0`) and uploads to Qdrant
+This runs the following stages sequentially:
+1. Ensures the MySQL `blog` table exists
+2. Loads known article URLs from MySQL to avoid re-scraping
+3. Scrapes new articles from `blog.asnany.net` (incremental — skips known URLs) and inserts directly into MySQL via the `on_article` callback
+4. Exports all articles from MySQL to `scraper/articles.csv` as a backup
+5. Checks if the Qdrant collection exists (if not, resets `is_embedded = 0` for all articles to trigger a full rebuild)
+6. Embeds only unembedded articles (`is_embedded = 0`) and uploads to Qdrant, marking each article as embedded per-article after successful upload
 
 ### FastAPI server (chatbot backend)
 
@@ -223,7 +250,23 @@ Starts uvicorn on `0.0.0.0:8000` with hot reload. Endpoints:
 python -m scraper.asnany_scraper
 ```
 
-Scrapes all article pages from the WordPress blog and appends new articles to `scraper/articles.csv`.
+Scrapes all article pages from the WordPress blog and appends new articles to `scraper/articles.csv` (standalone CSV mode). For production, the scraper is called by `main.py` with `write_csv=False` and `on_article=insert_blog_article` for direct MySQL insertion.
+
+### Utility scripts
+
+```bash
+# Test MySQL connectivity and verify the blog table
+uv run python scripts/test_mysql.py
+
+# One-time legacy CSV import into MySQL
+uv run python scripts/import_csv_to_mysql.py
+
+# Check for duplicate normalized URLs in MySQL
+uv run python scripts/check_duplicate_urls.py
+
+# Deduplicate MySQL blog URLs (dry-run by default — set DRY_RUN=False inside the script to execute)
+uv run python scripts/dedupe_mysql_blog_urls.py
+```
 
 ### Embedding trigger endpoint (standalone server)
 
@@ -231,7 +274,7 @@ Scrapes all article pages from the WordPress blog and appends new articles to `s
 python fastapi_embedding.py
 ```
 
-Starts a separate FastAPI server with `POST /run-embedding` that runs the full pipeline (`main.py`) in a background thread.
+Starts a separate FastAPI server on port 8000 with `POST /run-embedding` that runs the full pipeline (`main.py`) in a background thread.
 
 ---
 
@@ -345,21 +388,22 @@ curl -X POST http://localhost:8001/run-embedding
 
 ### Step 1: Article Ingestion
 
-1. **Scrape** — `asnany_scraper.py` visits the WordPress blog paginated listing (`/`, `/page/2/`, ...), extracts each article's title (from `<h1 class="wp-block-post-title">`) and content (from `<div class="entry-content">`), normalizes URLs (lowercase, removes fragments and tracking params), and appends new articles to `articles.csv`.
-2. **Seed** — `database_server.py` reads the CSV and inserts rows into SQLite with `INSERT OR IGNORE` — the `UNIQUE` constraint on `url` prevents duplicates.
+1. **Scrape** — `asnany_scraper.py` visits the WordPress blog paginated listing (`/`, `/page/2/`, ...), extracts each article's title (from `<h1 class="wp-block-post-title">`) and content (from `<div class="entry-content">`), normalizes URLs (lowercase, decodes percent-encoding, removes fragments and tracking params like `utm_*`, `fbclid`, `gclid`), and inserts directly into MySQL via the `on_article` callback (`insert_blog_article`).
+2. **Export backup** — `database_server.py` exports all articles from MySQL to `scraper/articles.csv` as a backup CSV.
 3. **Chunk** — `embedder.py` splits each article's content into overlapping chunks of 800 characters with 200 characters of overlap (a sliding window).
 4. **Embed** — Each chunk is prefixed with `"passage: {title}\n\n"` (the E5 model expects this format) and encoded into a 1024-dimensional vector using `intfloat/multilingual-e5-large` via SentenceTransformer.
-5. **Upload** — Each chunk becomes a Qdrant point with a deterministic ID (`{blog_id}_{chunk_index}` → UUIDv5), the named vector `embedding_text`, and a payload containing `blog_id`, `chunk_index`, and `chunk_text`. Points are upserted in batches of 8. After each article's chunks are successfully uploaded, the article is marked `is_embedded = 1` in SQLite.
+5. **Upload** — Each chunk becomes a Qdrant point with a deterministic ID (`{blog_id}_{chunk_index}` → UUIDv5), the named vector `embedding_text`, and a payload containing `blog_id`, `chunk_index`, and `chunk_text`. Points are upserted in batches of 8. After each article's chunks are successfully uploaded, the article is marked `is_embedded = 1` in MySQL. If the Qdrant collection doesn't exist, all articles are reset to `is_embedded = 0` for a full rebuild.
 
 ### Step 2: Answering a Question
 
 1. **User types** a question in the Arabic chat widget (`web/index.html`) or sends a `POST /chat/` request.
-2. **Short/greeting filter** — queries under 6 characters or containing greeting keywords return a polite message without hitting the database.
-3. **Retrieve** — The question is encoded with the prefix `"query: {text}"` using the same embedding model, then Qdrant searches for the top-3 most similar chunks using COSINE distance.
-4. **Fetch sources** — The unique `blog_id` values from the retrieved chunks are used to look up the article title and URL from SQLite.
-5. **Build context** — Retrieved chunks are assembled into a structured context (up to `CONTEXT_MAX_CHARS` characters) with `[CHUNK 1] TEXT: ...` markers.
-6. **Generate answer** — The system prompt, user question, and context are sent to Groq's `openai/gpt-oss-20b` model. The prompt instructs the LLM to answer in Arabic, use the context as its primary reference, avoid fabricating statistics, and never mention sources or URLs in the answer text.
-7. **Return** — The LLM's answer is cleaned of Arabic diacritics, deduplicated source links are appended, and the final `{reply, sources}` response is returned to the user and logged to `chat_logs.jsonl`.
+2. **Greeting detection** — The query is normalized (lowercased, Arabic Alef variants unified, tatweel removed, punctuation/emoji stripped) and compared against a curated list of Arabic and English greetings. If it's a standalone greeting (or greeting with ≤2 filler tokens), a polite welcome message is returned without hitting the database.
+3. **Short query rejection** — Queries under 6 characters return a prompt for a clear medical question.
+4. **Retrieve** — The question is encoded with the prefix `"query: {text}"` using the same embedding model, then Qdrant searches for the top-K (default 3) most similar chunks using COSINE distance.
+5. **Fetch sources** — The unique `blog_id` values from the retrieved chunks are used to look up the article title and URL from MySQL.
+6. **Build context** — Retrieved chunks are assembled into a structured context (up to `CONTEXT_MAX_CHARS` characters) with `[CHUNK 1] TEXT: ...` markers.
+7. **Generate answer** — The system prompt, user question, and context are sent to Groq's `openai/gpt-oss-20b` model with retry logic (4 attempts, exponential backoff). The prompt instructs the LLM to answer in Arabic, use the context as its primary reference, avoid fabricating statistics, and never mention sources or URLs in the answer text.
+8. **Return** — The LLM's answer is cleaned of Arabic diacritics, deduplicated source links are appended, and the final `{reply, sources}` response is returned to the user and logged to `chat_logs.jsonl` (logging can be disabled via `ENABLE_CHAT_LOGS=false`).
 
 ---
 
@@ -367,11 +411,10 @@ curl -X POST http://localhost:8001/run-embedding
 
 - **HuggingFace model download (~1.1 GB):** The embedding model `intfloat/multilingual-e5-large` downloads automatically on first run via SentenceTransformer. The cache directory is `.cache/` (gitignored). Ensure sufficient disk space and internet connectivity on the deployment server.
 - **Runtime-created files:** The following files are gitignored and created at runtime:
-  - `database/database.db` — SQLite database
   - `logs/chat_logs.jsonl` — chat interaction logs
-  - `scraper/articles.csv` — scraped article data
+  - `scraper/articles.csv` — MySQL backup export
   - `.cache/` — HuggingFace model cache
-- **Hardcoded API URL in frontend:** The chat widget at `web/index.html` hardcodes `const API_BASE = "https://api.alahliadental.com"` (line 302). Change this to match your deployment URL before using the frontend.
+- **Dynamic API URL in frontend:** The chat widget at `web/index.html` dynamically selects the API base URL based on the hostname: `localhost`/`127.0.0.1` → `http://localhost:8000`, otherwise → `https://blog-chat.alahliadental.com`. Change the production URL to match your deployment.
 - **CORS:** The FastAPI server allows all origins (`allow_origins=["*"]`). Restrict this in production.
 - **No authentication:** The API has no authentication layer. Add API key validation or a reverse proxy for production use.
 
@@ -379,13 +422,13 @@ curl -X POST http://localhost:8001/run-embedding
 
 ## Known Limitations
 
-1. **Hardcoded API URL** — `web/index.html` has `const API_BASE = "https://api.alahliadental.com"` hardcoded in two places, making it impossible to switch environments without editing the file.
-2. **Synchronous architecture** — All Qdrant, SQLite, and Groq calls are synchronous (`def`, not `async def`). Long requests block the entire event loop.
+1. **Dynamic API URL (still environment-specific)** — `web/index.html` selects the API URL based on hostname, but custom deployments must edit `const API_BASE` logic in the frontend.
+2. **Synchronous architecture** — All Qdrant, MySQL, and Groq calls are synchronous (`def`, not `async def`). Long requests block the entire event loop.
 3. **Character-based chunking** — Text is split at exact character boundaries (800 chars, 200 overlap), which can cut sentences or words in half. No sentence-aware or semantic splitting is used.
 4. **No similarity threshold** — The retriever returns the top-K results regardless of how low the similarity score is, which can lead to irrelevant context being fed to the LLM.
 5. **Wide-open CORS** — `allow_origins=["*"]` allows any website to call the API.
 6. **No rate limiting** — The chat endpoint has no request rate limiting or throttling.
-7. **No caching** — Every query independently embeds the input, searches Qdrant, fetches from SQLite, and calls Groq. Repeated identical queries are processed fresh each time.
+7. **No caching** — Every query independently embeds the input, searches Qdrant, fetches from MySQL, and calls Groq. Repeated identical queries are processed fresh each time.
 8. **No user authentication** — The API is fully open; there is no mechanism to identify or restrict users.
 9. **Inconsistent default values** — `QDRANT_TIMEOUT` defaults to `120` in `main.py` but `60` in `qdrant_retriever.py`.
 10. **Large model download** — The embedding model (~1.1 GB) downloads on first run, which can be slow and requires substantial disk space.
