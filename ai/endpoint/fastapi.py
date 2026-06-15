@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from ai.endpoint import chat, admin
 
@@ -28,6 +29,8 @@ app.include_router(
     prefix="/api/admin",
     tags=["admin"],
 )
+
+app.mount("/dashboard", StaticFiles(directory="dashboard", html=True), name="dashboard")
 
 @app.get("/health")
 def health_check():

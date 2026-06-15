@@ -991,17 +991,17 @@ Verify theme persists across page reloads.
 
 Milestone 3 is complete when:
 
-* [] Single index.html exists
-* [] Sidebar works
-* [] Tab switching works
-* [] All sections render
-* [] No external UI framework is required
-* [] Dashboard works from one HTML file
-* [] Theme toggle appears in header
-* [] System mode respects OS preference
-* [] Light mode forces light palette
-* [] Dark mode forces dark palette
-* [] Preference persists across reloads
+* [x] Single index.html exists
+* [x] Sidebar works
+* [x] Tab switching works
+* [x] All sections render
+* [x] No external UI framework is required
+* [x] Dashboard works from one HTML file
+* [x] Theme toggle appears in header
+* [x] System mode respects OS preference
+* [x] Light mode forces light palette
+* [x] Dark mode forces dark palette
+* [x] Preference persists across reloads
 
 ---
 
