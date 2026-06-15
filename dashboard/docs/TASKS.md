@@ -429,11 +429,11 @@ Add error event logging.
 
 Milestone 1 is complete when:
 
-* [ ] dashboard_logs exists
-* [ ] chat_logs exists
-* [ ] logging helper exists
-* [ ] scraper logs events
-* [ ] embedding logs events
+* [x] dashboard_logs exists
+* [x] chat_logs exists
+* [x] logging helper exists
+* [x] scraper logs events
+* [x] embedding logs events
 
 ---
 

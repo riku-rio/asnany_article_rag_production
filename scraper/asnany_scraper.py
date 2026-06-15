@@ -7,6 +7,8 @@ from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode, unquote, qu
 import requests
 from bs4 import BeautifulSoup
 
+from database.dashboard_logger import log_event
+
 BASE_URL = "https://blog.asnany.net"
 
 HEADERS = {
@@ -240,6 +242,11 @@ def scrape_all_articles(
     new_count = 0
     page = 1
 
+    log_event(
+        "scraper_started",
+        f"Scraping started, pages={'unlimited' if total_pages==0 else total_pages}",
+    )
+
     while True:
         if total_pages != 0 and page > total_pages:
             break
@@ -251,9 +258,11 @@ def scrape_all_articles(
         except requests.HTTPError:
             # Most WordPress blogs return 404 when page is out of range
             print(f"⛔ Page {page} not available, stopping.")
+            log_event("scraper_failed", f"Page {page} not available")
             break
         except requests.RequestException as e:
             print(f"⛔ Failed to fetch page {page}: {e}")
+            log_event("scraper_failed", f"Failed to fetch page {page}: {e}")
             break
 
         if not links:
@@ -293,6 +302,7 @@ def scrape_all_articles(
         page += 1
 
     print(f"\n✅ New articles processed: {new_count}")
+    log_event("scraper_completed", f"Scraping completed, {new_count} new articles")
     return new_count
 
 
