@@ -1261,12 +1261,12 @@ Verify deleted item disappears.
 
 Milestone 4 is complete when:
 
-* [] Knowledge list loads
-* [] Knowledge search works
-* [] View modal works
-* [] Delete workflow works
-* [] UI refreshes correctly
-* [] Errors are handled
+* [x] Knowledge list loads
+* [x] Knowledge search works
+* [x] View modal works
+* [x] Delete workflow works
+* [x] UI refreshes correctly
+* [x] Errors are handled
 
 ---
 

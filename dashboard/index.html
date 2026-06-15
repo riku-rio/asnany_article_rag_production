@@ -109,12 +109,27 @@
 
   .empty-state { text-align: center; padding: 48px 16px; color: var(--text-secondary); font-size: 14px; }
 
+  .knowledge-search { width: 100%; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-surface); color: var(--text-primary); margin-bottom: 16px; outline: none; }
+  .knowledge-search:focus { border-color: var(--color-accent); }
+  .knowledge-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .knowledge-table th { text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--border-color); color: var(--text-secondary); font-weight: 500; white-space: nowrap; }
+  .knowledge-table td { padding: 10px 12px; border-bottom: 1px solid var(--border-color); }
+  .knowledge-table tbody tr:hover td { background: var(--bg-sidebar-hover); }
+  .knowledge-table .truncate { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+  .actions-cell { white-space: nowrap; }
+  .actions-cell button { padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px; cursor: pointer; background: var(--bg-surface); color: var(--text-primary); }
+  .actions-cell button:hover { background: var(--bg-sidebar-hover); }
+  .actions-cell .view-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  .actions-cell .delete-btn { color: var(--badge-error-text); }
+  .actions-cell .delete-btn:hover { border-color: var(--badge-error-text); }
+
   @media (max-width: 700px) {
     .sidebar { width: 56px; }
     .sidebar-item span:not(.sidebar-icon) { display: none; }
     .sidebar-item { justify-content: center; padding: 12px; }
     .content { padding: 20px 16px; }
     .kpi-row { grid-template-columns: 1fr 1fr; }
+    #knowledgeTableContainer { overflow-x: auto; }
   }
 </style>
 </head>
@@ -186,7 +201,23 @@
       <section class="section" id="section-knowledge">
         <h1 class="section-title">Knowledge</h1>
         <p class="section-desc">Browse and manage knowledge entries</p>
-        <div class="placeholder-text">Knowledge list will appear here</div>
+        <input type="text" id="knowledgeSearch" class="knowledge-search" placeholder="Search knowledge...">
+        <div id="knowledgeTableContainer">
+          <table class="knowledge-table" id="knowledgeTable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>URL</th>
+                <th>Embedded</th>
+                <th>Created At</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="knowledgeTableBody"></tbody>
+          </table>
+          <div id="knowledgeEmpty" class="empty-state" style="display:none;">No knowledge entries found</div>
+        </div>
       </section>
 
       <section class="section" id="section-scraper">
@@ -250,6 +281,7 @@
       });
       var target = sections[tab];
       if (target) target.classList.add('active');
+      if (tab === 'knowledge') fetchKnowledge();
     });
 
     /* --- Theme --- */
@@ -365,6 +397,155 @@
     window.createBadge = function(text, variant) {
       return '<span class="badge badge-' + (variant || 'success') + '">' + text + '</span>';
     };
+
+    /* --- Knowledge Management --- */
+    var knowledgeData = [];
+    var knowledgeSearchEl = document.getElementById('knowledgeSearch');
+    var knowledgeTableContainer = document.getElementById('knowledgeTableContainer');
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      var div = document.createElement('div');
+      div.appendChild(document.createTextNode(str));
+      return div.innerHTML;
+    }
+
+    function filteredKnowledge() {
+      var term = knowledgeSearchEl ? knowledgeSearchEl.value.trim().toLowerCase() : '';
+      if (!term) return knowledgeData;
+      return knowledgeData.filter(function(item) {
+        return (item.title && item.title.toLowerCase().includes(term)) ||
+               (item.url && item.url.toLowerCase().includes(term));
+      });
+    }
+
+    function renderKnowledgeTable(data) {
+      var table = document.getElementById('knowledgeTable');
+      var empty = document.getElementById('knowledgeEmpty');
+      var tbody = document.getElementById('knowledgeTableBody');
+      if (!data || data.length === 0) {
+        table.style.display = 'none';
+        empty.style.display = 'block';
+        return;
+      }
+      table.style.display = '';
+      empty.style.display = 'none';
+      tbody.innerHTML = '';
+      data.forEach(function(item) {
+        var badge = item.is_embedded === 1
+          ? createBadge('Embedded', 'success')
+          : createBadge('Pending', 'warning');
+        var tr = document.createElement('tr');
+        tr.dataset.id = item.id;
+        tr.innerHTML =
+          '<td>' + item.id + '</td>' +
+          '<td><span class="truncate" title="' + escapeHtml(item.title) + '">' + escapeHtml(item.title) + '</span></td>' +
+          '<td><span class="truncate" title="' + escapeHtml(item.url) + '">' + escapeHtml(item.url) + '</span></td>' +
+          '<td>' + badge + '</td>' +
+          '<td>' + escapeHtml(item.created_at) + '</td>' +
+          '<td class="actions-cell">' +
+            '<button class="view-btn">View</button> ' +
+            '<button class="delete-btn">Delete</button>' +
+          '</td>';
+        tbody.appendChild(tr);
+      });
+    }
+
+    function fetchKnowledge() {
+      if (knowledgeData.length > 0) {
+        renderKnowledgeTable(filteredKnowledge());
+        return;
+      }
+      var spinner = showSpinner(knowledgeTableContainer);
+      fetch('/api/admin/knowledge')
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          knowledgeData = data;
+          renderKnowledgeTable(filteredKnowledge());
+        })
+        .catch(function(err) {
+          console.error('Failed to load knowledge:', err);
+          showToast('Failed to load knowledge entries', 'error');
+        })
+        .finally(function() {
+          hideSpinner(spinner);
+        });
+    }
+
+    if (knowledgeSearchEl) {
+      knowledgeSearchEl.addEventListener('input', function() {
+        renderKnowledgeTable(filteredKnowledge());
+      });
+    }
+
+    knowledgeTableContainer.addEventListener('click', function(e) {
+      var btn = e.target.closest('button');
+      if (!btn) return;
+      var tr = btn.closest('tr');
+      var id = tr ? parseInt(tr.dataset.id) : null;
+      if (!id) return;
+
+      if (btn.classList.contains('view-btn')) {
+        var loadingOverlay = openModal({
+          title: 'Loading...',
+          body: '<p>Loading knowledge details...</p>',
+          cancelText: null,
+          confirmText: null
+        });
+        fetch('/api/admin/knowledge/' + id)
+          .then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          })
+          .then(function(item) {
+            closeModal(loadingOverlay);
+            openModal({
+              title: escapeHtml(item.title),
+              body:
+                '<p><a href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener">' + escapeHtml(item.url) + '</a></p>' +
+                '<div style="max-height:300px;overflow-y:auto;background:var(--bg-body);padding:12px;border-radius:4px;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:var(--text-primary);margin-top:8px;">' + escapeHtml(item.content) + '</div>',
+              confirmText: null,
+              cancelText: 'Close'
+            });
+          })
+          .catch(function(err) {
+            closeModal(loadingOverlay);
+            showToast('Failed to load knowledge details', 'error');
+          });
+      }
+
+      if (btn.classList.contains('delete-btn')) {
+        openModal({
+          title: 'Confirm Delete',
+          body: '<p>Are you sure you want to delete this knowledge entry? This action cannot be undone.</p>',
+          confirmText: 'Delete',
+          cancelText: 'Cancel',
+          onConfirm: function() {
+            var delSpinner = showSpinner(document.body);
+            fetch('/api/admin/knowledge/' + id, { method: 'DELETE' })
+              .then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+              })
+              .then(function() {
+                showToast('Knowledge entry deleted', 'success');
+                knowledgeData = [];
+                fetchKnowledge();
+              })
+              .catch(function(err) {
+                console.error('Failed to delete knowledge:', err);
+                showToast('Failed to delete knowledge entry', 'error');
+              })
+              .finally(function() {
+                hideSpinner(delSpinner);
+              });
+          }
+        });
+      }
+    });
   })();
 </script>
 </body>
