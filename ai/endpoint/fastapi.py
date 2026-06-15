@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from ai.endpoint import chat
+from ai.endpoint import chat, admin
 
 app = FastAPI(
     title="Asnany AI API",
@@ -21,6 +21,12 @@ app.include_router(
     chat.router,
     prefix="/chat",
     tags=["chat"],
+)
+
+app.include_router(
+    admin.router,
+    prefix="/api/admin",
+    tags=["admin"],
 )
 
 @app.get("/health")

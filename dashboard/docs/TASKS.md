@@ -27,7 +27,7 @@ The dashboard must:
 # Task Status Legend
 
 ```text
-[ ] Not Started
+[] Not Started
 [-] In Progress
 [x] Completed
 [!] Blocked
@@ -723,12 +723,12 @@ Verify response.
 
 Milestone 2 is complete when:
 
-* [ ] Admin router exists
-* [ ] Stats endpoint works
-* [ ] Knowledge endpoints work
-* [ ] Logs endpoint works
-* [ ] Health endpoint works
-* [ ] API.md matches implementation
+* [x] Admin router exists
+* [x] Stats endpoint works
+* [x] Knowledge endpoints work
+* [x] Logs endpoint works
+* [x] Health endpoint works
+* [x] API.md matches implementation
 
 ---
 
@@ -896,16 +896,112 @@ Create empty-state component.
 
 ---
 
+# Atomic Milestone 3.4
+
+## Atomic Milestone Goal
+
+Implement System, Light, and Dark theme modes with persistence.
+
+---
+
+### Atomic Tasks
+
+#### DG-341
+
+Refactor CSS to use custom properties (CSS variables).
+
+Replace all hardcoded colors with `var(--token)` references.
+
+---
+
+#### DG-342
+
+Define dark palette CSS variables.
+
+Tokens:
+
+```text
+--bg-body:       #0f0f1a
+--bg-surface:    #1a1a2e
+--bg-sidebar:    #16162a
+--bg-sidebar-active: #25254a
+--bg-sidebar-hover:  #1e1e38
+--bg-card:       #1a1a2e
+--border-color:  #2a2a44
+--text-primary:  #e8e8f0
+--text-heading:  #f0f0ff
+--text-secondary:#8888aa
+--text-sidebar:  #6666aa
+--color-accent:  #8b9dff
+```
+
+---
+
+#### DG-343
+
+Add theme toggle button to `.header`.
+
+Cycle order: System → Light → Dark → System.
+
+Icons:
+
+```text
+System: 🖥
+Light:  ☀️
+Dark:   🌙
+```
+
+---
+
+#### DG-344
+
+Implement theme switching logic.
+
+Apply `theme-light` or `theme-dark` class on `<html>`.
+
+---
+
+#### DG-345
+
+Add system preference listener.
+
+Watch `matchMedia('(prefers-color-scheme: dark)')` — apply dark when matches, light otherwise. Re-evaluate on change event when mode is `system`.
+
+---
+
+#### DG-346
+
+Add localStorage persistence.
+
+```text
+localStorage.setItem('theme', mode)
+```
+
+Default to `'system'` when no saved preference exists.
+
+---
+
+#### DG-347
+
+Verify theme persists across page reloads.
+
+---
+
 # Milestone 3 DoD
 
 Milestone 3 is complete when:
 
-* [ ] Single index.html exists
-* [ ] Sidebar works
-* [ ] Tab switching works
-* [ ] All sections render
-* [ ] No external UI framework is required
-* [ ] Dashboard works from one HTML file
+* [] Single index.html exists
+* [] Sidebar works
+* [] Tab switching works
+* [] All sections render
+* [] No external UI framework is required
+* [] Dashboard works from one HTML file
+* [] Theme toggle appears in header
+* [] System mode respects OS preference
+* [] Light mode forces light palette
+* [] Dark mode forces dark palette
+* [] Preference persists across reloads
 
 ---
 
@@ -1165,12 +1261,12 @@ Verify deleted item disappears.
 
 Milestone 4 is complete when:
 
-* [ ] Knowledge list loads
-* [ ] Knowledge search works
-* [ ] View modal works
-* [ ] Delete workflow works
-* [ ] UI refreshes correctly
-* [ ] Errors are handled
+* [] Knowledge list loads
+* [] Knowledge search works
+* [] View modal works
+* [] Delete workflow works
+* [] UI refreshes correctly
+* [] Errors are handled
 
 ---
 
@@ -1400,12 +1496,12 @@ Refresh dashboard stats.
 
 Milestone 5 is complete when:
 
-* [ ] Scraper can be triggered
-* [ ] Embedding can be triggered
-* [ ] Rebuild can be triggered
-* [ ] Loading states work
-* [ ] Success states work
-* [ ] Failure states work
+* [] Scraper can be triggered
+* [] Embedding can be triggered
+* [] Rebuild can be triggered
+* [] Loading states work
+* [] Success states work
+* [] Failure states work
 
 ---
 
@@ -1637,12 +1733,12 @@ Display offline indicator.
 
 Milestone 6 is complete when:
 
-* [ ] Chat Test works
-* [ ] AI response displays
-* [ ] Sources display
-* [ ] Health section loads
-* [ ] All status cards render
-* [ ] Refresh works
+* [] Chat Test works
+* [] AI response displays
+* [] Sources display
+* [] Health section loads
+* [] All status cards render
+* [] Refresh works
 
 ---
 
@@ -1884,11 +1980,11 @@ Create backup before release.
 
 Milestone 7 is complete when:
 
-* [ ] All endpoints tested
-* [ ] All UI flows tested
-* [ ] All operations validated
-* [ ] Documentation matches implementation
-* [ ] Dashboard ready for client usage
+* [] All endpoints tested
+* [] All UI flows tested
+* [] All operations validated
+* [] Documentation matches implementation
+* [] Dashboard ready for client usage
 
 ---
 
@@ -1900,24 +1996,24 @@ Milestone 7 is complete when:
 
 Dashboard V1 is complete when:
 
-* [ ] dashboard/index.html exists
-* [ ] Dashboard works from a single HTML file
-* [ ] No frontend framework is used
-* [ ] Overview section works
-* [ ] Knowledge section works
-* [ ] Scraper section works
-* [ ] Embedding section works
-* [ ] Chat Test section works
-* [ ] Logs section works
-* [ ] Health section works
-* [ ] Existing RAG pipeline still works
-* [ ] Existing chat endpoint still works
-* [ ] Existing embedding endpoint still works
-* [ ] Existing health endpoint still works
-* [ ] Database migrations completed
-* [ ] dashboard_logs records events
-* [ ] chat_logs records interactions
-* [ ] No breaking changes introduced
+* [] dashboard/index.html exists
+* [] Dashboard works from a single HTML file
+* [] No frontend framework is used
+* [] Overview section works
+* [] Knowledge section works
+* [] Scraper section works
+* [] Embedding section works
+* [] Chat Test section works
+* [] Logs section works
+* [] Health section works
+* [] Existing RAG pipeline still works
+* [] Existing chat endpoint still works
+* [] Existing embedding endpoint still works
+* [] Existing health endpoint still works
+* [] Database migrations completed
+* [] dashboard_logs records events
+* [] chat_logs records interactions
+* [] No breaking changes introduced
 
 ---
 
@@ -1925,12 +2021,12 @@ Dashboard V1 is complete when:
 
 Before adding any feature, verify:
 
-* [ ] Does this help the client operate the RAG?
-* [ ] Does this avoid developer intervention?
-* [ ] Does this fit Dashboard V1?
-* [ ] Does this avoid new infrastructure?
-* [ ] Does this avoid frontend frameworks?
-* [ ] Does this avoid unnecessary complexity?
+* [] Does this help the client operate the RAG?
+* [] Does this avoid developer intervention?
+* [] Does this fit Dashboard V1?
+* [] Does this avoid new infrastructure?
+* [] Does this avoid frontend frameworks?
+* [] Does this avoid unnecessary complexity?
 
 If any answer is NO:
 
@@ -1942,18 +2038,18 @@ Move feature to V2.
 
 # PRODUCTION READINESS CHECKLIST
 
-* [ ] API endpoints respond correctly
-* [ ] Dashboard loads without errors
-* [ ] MySQL connection works
-* [ ] Qdrant connection works
-* [ ] Groq connection works
-* [ ] Scraper execution works
-* [ ] Embedding execution works
-* [ ] Chat responses work
-* [ ] Health checks work
-* [ ] Logs are generated
-* [ ] Stats are accurate
-* [ ] Client can operate system independently
+* [] API endpoints respond correctly
+* [] Dashboard loads without errors
+* [] MySQL connection works
+* [] Qdrant connection works
+* [] Groq connection works
+* [] Scraper execution works
+* [] Embedding execution works
+* [] Chat responses work
+* [] Health checks work
+* [] Logs are generated
+* [] Stats are accurate
+* [] Client can operate system independently
 
 ---
 
