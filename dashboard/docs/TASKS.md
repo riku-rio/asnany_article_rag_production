@@ -1733,12 +1733,12 @@ Display offline indicator.
 
 Milestone 6 is complete when:
 
-* [] Chat Test works
-* [] AI response displays
-* [] Sources display
-* [] Health section loads
-* [] All status cards render
-* [] Refresh works
+* [x] Chat Test works
+* [x] AI response displays
+* [x] Sources display
+* [x] Health section loads
+* [x] All status cards render
+* [x] Refresh works
 
 ---
 
