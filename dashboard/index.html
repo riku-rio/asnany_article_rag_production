@@ -95,9 +95,60 @@
   @keyframes toast-in { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
 
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 999; }
-  .modal-box { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 24px; min-width: 320px; max-width: 480px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
-  .modal-box h2 { font-size: 18px; color: var(--text-heading); margin-bottom: 8px; }
-  .modal-box p { font-size: 14px; color: var(--text-secondary); margin-bottom: 16px; }
+  .modal-box {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 24px;
+
+    width: min(480px, calc(100vw - 32px));
+    min-width: 0;
+    max-width: calc(100vw - 32px);
+
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    overflow: hidden;
+  }
+
+  .modal-box h2 {
+    font-size: 18px;
+    color: var(--text-heading);
+    margin-bottom: 8px;
+    overflow-wrap: anywhere;
+  }
+
+  .modal-box p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  .modal-body {
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .modal-url-line {
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .modal-url {
+    display: inline-block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-wrap: break-word;
+    word-break: break-all;
+
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
   .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
   .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-secondary); padding: 4px; line-height: 1; }
   .modal-close:hover { color: var(--text-heading); }
@@ -369,7 +420,7 @@
           '<h2 style="margin:0;">' + (opts.title || '') + '</h2>' +
           '<button class="modal-close" style="margin-top:-4px;">&times;</button>' +
         '</div>' +
-        '<div>' + (opts.body || '') + '</div>' +
+        '<div class="modal-body">' + (opts.body || '') + '</div>' +
         (opts.confirmText || opts.cancelText
           ? '<div class="modal-actions" style="margin-top:16px;">' +
             (opts.cancelText ? '<button class="sidebar-item" style="width:auto;padding:6px 16px;justify-content:center;">' + opts.cancelText + '</button>' : '') +
@@ -505,8 +556,8 @@
             openModal({
               title: escapeHtml(item.title),
               body:
-                '<p><a href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener">' + escapeHtml(item.url) + '</a></p>' +
-                '<div style="max-height:300px;overflow-y:auto;background:var(--bg-body);padding:12px;border-radius:4px;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:var(--text-primary);margin-top:8px;">' + escapeHtml(item.content) + '</div>',
+                '<p class="modal-url-line"><a class="modal-url" href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(item.url) + '</a></p>' +
+                '<div style="max-height:300px;overflow-y:auto;background:var(--bg-body);padding:12px;border-radius:4px;font-size:13px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;color:var(--text-primary);margin-top:8px;">' + escapeHtml(item.content) + '</div>',
               confirmText: null,
               cancelText: 'Close'
             });
