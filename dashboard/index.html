@@ -84,6 +84,22 @@
 
   .placeholder-text { color: var(--text-secondary); font-size: 14px; text-align: center; padding: 48px 0; }
 
+  /* --- Chat Test --- */
+  #chatQuery { width:100%; border:1px solid var(--border-color); border-radius:6px; padding:10px 12px; font-size:15px; font-family:inherit; resize:vertical; background:var(--bg-surface); color:var(--text-primary); line-height:1.6; }
+  #chatQuery:focus { outline:none; border-color:var(--color-accent); }
+  .chat-section-label { font-weight:600; margin-bottom:8px; color:var(--text-heading); }
+  .chat-reply { line-height:1.7; white-space:pre-wrap; color:var(--text-primary); }
+  #chatSources ul { margin:0; padding-left:20px; }
+  #chatSources li { margin-bottom:6px; font-size:14px; }
+  #chatSources a { color:var(--color-accent); text-decoration:none; }
+  #chatSources a:hover { text-decoration:underline; }
+  #chatSources .empty-state { padding:12px 0; }
+
+  /* --- Health --- */
+  .health-card { background:var(--bg-card); border:1px solid var(--border-color); border-radius:8px; padding:20px; display:flex; flex-direction:column; gap:8px; }
+  .health-label { font-size:13px; color:var(--text-secondary); }
+  .health-status { font-size:15px; font-weight:500; }
+
   /* --- Utilities --- */
   .spinner { width: 24px; height: 24px; border: 3px solid var(--border-color); border-top-color: var(--color-accent); border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -312,7 +328,24 @@
       <section class="section" id="section-chat-test">
         <h1 class="section-title">Chat Test</h1>
         <p class="section-desc">Test the AI chatbot</p>
-        <div class="placeholder-text">Chat test interface will appear here</div>
+
+        <div class="card" style="display:flex;flex-direction:column;gap:12px;">
+          <textarea id="chatQuery" rows="4" placeholder="Type your question in Arabic..."></textarea>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <button id="askBtn" class="op-btn">&#9654; Ask</button>
+            <span id="chatStatus" class="op-status"></span>
+          </div>
+        </div>
+
+        <div id="chatResponseCard" class="card" style="display:none;">
+          <div class="chat-section-label">Response</div>
+          <div id="chatReply" class="chat-reply"></div>
+        </div>
+
+        <div id="chatSourcesCard" class="card" style="display:none;">
+          <div class="chat-section-label">Sources</div>
+          <div id="chatSources"></div>
+        </div>
       </section>
 
       <section class="section" id="section-logs">
@@ -324,7 +357,8 @@
       <section class="section" id="section-health">
         <h1 class="section-title">Health</h1>
         <p class="section-desc">System component status</p>
-        <div class="placeholder-text">Health status will appear here</div>
+        <button id="refreshHealthBtn" class="op-btn" style="margin-bottom:16px;">&#x21bb; Refresh</button>
+        <div id="healthCards" class="kpi-row"></div>
       </section>
     </main>
   </div>
@@ -360,6 +394,7 @@
       if (target) target.classList.add('active');
       if (tab === 'knowledge') fetchKnowledge();
       if (tab === 'scraper' || tab === 'embedding') updateLastRunTimes();
+      if (tab === 'health') fetchHealth();
     });
 
     /* --- Theme --- */
@@ -756,6 +791,107 @@
     if (embeddingBtn) embeddingBtn.addEventListener('click', runEmbedding);
     if (rebuildBtn) rebuildBtn.addEventListener('click', rebuildEverything);
 
+    /* --- Chat Test --- */
+    var askBtn = document.getElementById('askBtn');
+    var chatQuery = document.getElementById('chatQuery');
+    var chatStatus = document.getElementById('chatStatus');
+    var chatResponseCard = document.getElementById('chatResponseCard');
+    var chatReply = document.getElementById('chatReply');
+    var chatSources = document.getElementById('chatSources');
+    var chatSourcesCard = document.getElementById('chatSourcesCard');
+
+    function askQuestion() {
+      var query = chatQuery.value.trim();
+      if (!query) { showToast('Please enter a question', 'error'); return; }
+
+      askBtn.disabled = true;
+      chatStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Thinking...';
+      chatResponseCard.style.display = 'none';
+      chatSourcesCard.style.display = 'none';
+
+      fetch('/api/admin/chat-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: query })
+      })
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          chatReply.textContent = data.reply;
+          chatResponseCard.style.display = 'block';
+
+          var sourcesHtml = '';
+          if (data.sources && data.sources.length > 0) {
+            sourcesHtml = '<ul>';
+            data.sources.forEach(function(s) {
+              sourcesHtml += '<li><a href="' + s.url + '" target="_blank">' + s.title + '</a></li>';
+            });
+            sourcesHtml += '</ul>';
+          } else {
+            sourcesHtml = '<div class="empty-state" style="padding:12px 0;">No sources found</div>';
+          }
+          chatSources.innerHTML = sourcesHtml;
+          chatSourcesCard.style.display = 'block';
+        })
+        .catch(function(err) {
+          console.error('Chat test failed:', err);
+          showToast('Failed to get response', 'error');
+          chatReply.textContent = 'Error: ' + err.message;
+          chatResponseCard.style.display = 'block';
+          chatSourcesCard.style.display = 'none';
+        })
+        .finally(function() {
+          askBtn.disabled = false;
+          chatStatus.textContent = '';
+        });
+    }
+
+    if (askBtn) askBtn.addEventListener('click', askQuestion);
+    if (chatQuery) chatQuery.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) askQuestion();
+    });
+
+    /* --- Health --- */
+    var refreshHealthBtn = document.getElementById('refreshHealthBtn');
+
+    function fetchHealth() {
+      var container = document.getElementById('healthCards');
+      container.innerHTML = '<div class="placeholder-text">Loading...</div>';
+
+      fetch('/api/admin/health')
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          var components = [
+            { name: 'API', status: data.api },
+            { name: 'Database', status: data.database },
+            { name: 'Qdrant', status: data.qdrant },
+            { name: 'Groq', status: data.groq }
+          ];
+          var html = '';
+          components.forEach(function(c) {
+            var badge = c.status
+              ? '<span class="badge badge-success">Online</span>'
+              : '<span class="badge badge-error">Offline</span>';
+            html += '<div class="kpi-card">' +
+              '<div class="kpi-label">' + c.name + '</div>' +
+              '<div style="margin-top:8px;">' + badge + '</div>' +
+            '</div>';
+          });
+          container.innerHTML = html;
+        })
+        .catch(function(err) {
+          container.innerHTML = '<div class="placeholder-text">Failed to load health status</div>';
+          showToast('Failed to load health status', 'error');
+        });
+    }
+
+    if (refreshHealthBtn) refreshHealthBtn.addEventListener('click', fetchHealth);
+
     /* --- Shared --- */
     function updateLastRunTimes() {
       fetch('/api/admin/stats')
@@ -771,6 +907,7 @@
     }
 
     updateLastRunTimes();
+    fetchHealth();
   })();
 </script>
 </body>
