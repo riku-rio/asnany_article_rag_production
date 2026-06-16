@@ -118,7 +118,6 @@ def run_scraper():
         )
         from scraper.asnany_scraper import scrape_all_articles
 
-        log_event("scraper_started", "Scraper triggered from dashboard")
         try:
             known_urls = load_known_urls_from_db()
             scrape_all_articles(

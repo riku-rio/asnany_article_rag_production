@@ -5,5 +5,7 @@ if __name__ == "__main__":
         "ai.endpoint.fastapi:app",
         host="0.0.0.0",
         port=8000,
-        reload=True
+        reload=True,
+        access_log=True,
+        log_level="info",
     )

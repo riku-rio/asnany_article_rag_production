@@ -255,10 +255,14 @@ def scrape_all_articles(
 
         try:
             links = get_article_links_from_page(page)
-        except requests.HTTPError:
-            # Most WordPress blogs return 404 when page is out of range
-            print(f"⛔ Page {page} not available, stopping.")
-            log_event("scraper_failed", f"Page {page} not available")
+        except requests.HTTPError as e:
+            status = e.response.status_code if e.response is not None else None
+            if status == 404:
+                # Normal end-of-pages for WordPress pagination — not a failure
+                print(f"📭 Page {page} returned 404, no more pages.")
+                break
+            print(f"⛔ Page {page} HTTP error {status}: {e}")
+            log_event("scraper_failed", f"Page {page} HTTP error {status}: {e}")
             break
         except requests.RequestException as e:
             print(f"⛔ Failed to fetch page {page}: {e}")
