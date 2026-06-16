@@ -1945,13 +1945,13 @@ Verify Logs displays recent activity entries.
 
 Milestone 7 is complete when:
 
-* [] Overview KPI cards show live stats
-* [] Overview status fields show health data
-* [] Logs table renders entries from API
-* [] Logs refresh works
-* [] Sections auto-refresh on tab switch
-* [] Empty states display correctly
-* [] Error states display correctly
+* [x] Overview KPI cards show live stats
+* [x] Overview status fields show health data
+* [x] Logs table renders entries from API
+* [x] Logs refresh works
+* [x] Sections auto-refresh on tab switch
+* [x] Empty states display correctly
+* [x] Error states display correctly
 
 ---
 

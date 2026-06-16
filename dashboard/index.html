@@ -259,17 +259,17 @@
         <h1 class="section-title">Overview</h1>
         <p class="section-desc">System summary at a glance</p>
         <div class="kpi-row">
-          <div class="kpi-card"><div class="kpi-label">Total Content</div><div class="kpi-value">--</div></div>
-          <div class="kpi-card"><div class="kpi-label">Embedded</div><div class="kpi-value">--</div></div>
-          <div class="kpi-card"><div class="kpi-label">Pending</div><div class="kpi-value">--</div></div>
-          <div class="kpi-card"><div class="kpi-label">Questions</div><div class="kpi-value">--</div></div>
+          <div class="kpi-card"><div class="kpi-label">Total Content</div><div class="kpi-value" id="overviewTotalContent">--</div></div>
+          <div class="kpi-card"><div class="kpi-label">Embedded</div><div class="kpi-value" id="overviewEmbedded">--</div></div>
+          <div class="kpi-card"><div class="kpi-label">Pending</div><div class="kpi-value" id="overviewPending">--</div></div>
+          <div class="kpi-card"><div class="kpi-label">Questions</div><div class="kpi-value" id="overviewQuestions">--</div></div>
         </div>
         <div class="card">
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-            <div><div style="font-size:13px;color:var(--text-secondary);">Last Scraping</div><div style="font-weight:500;margin-top:2px;">--</div></div>
-            <div><div style="font-size:13px;color:var(--text-secondary);">Last Embedding</div><div style="font-weight:500;margin-top:2px;">--</div></div>
-            <div><div style="font-size:13px;color:var(--text-secondary);">Database</div><div style="font-weight:500;margin-top:2px;">--</div></div>
-            <div><div style="font-size:13px;color:var(--text-secondary);">Qdrant</div><div style="font-weight:500;margin-top:2px;">--</div></div>
+            <div><div style="font-size:13px;color:var(--text-secondary);">Last Scraping</div><div style="font-weight:500;margin-top:2px;" id="overviewLastScraping">--</div></div>
+            <div><div style="font-size:13px;color:var(--text-secondary);">Last Embedding</div><div style="font-weight:500;margin-top:2px;" id="overviewLastEmbedding">--</div></div>
+            <div><div style="font-size:13px;color:var(--text-secondary);">Database</div><div style="font-weight:500;margin-top:2px;" id="overviewDatabase">--</div></div>
+            <div><div style="font-size:13px;color:var(--text-secondary);">Qdrant</div><div style="font-weight:500;margin-top:2px;" id="overviewQdrant">--</div></div>
           </div>
         </div>
       </section>
@@ -351,7 +351,19 @@
       <section class="section" id="section-logs">
         <h1 class="section-title">Logs</h1>
         <p class="section-desc">System activity log</p>
-        <div class="placeholder-text">Log entries will appear here</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+          <button id="refreshLogsBtn" class="op-btn">&#x21bb; Refresh</button>
+          <span id="logsStatus" class="op-status"></span>
+        </div>
+        <div id="logsTableContainer">
+          <table class="knowledge-table" id="logsTable">
+            <thead>
+              <tr><th>Timestamp</th><th>Event</th></tr>
+            </thead>
+            <tbody id="logsTableBody"></tbody>
+          </table>
+          <div id="logsEmpty" class="empty-state" style="display:none;">No log entries yet</div>
+        </div>
       </section>
 
       <section class="section" id="section-health">
@@ -392,8 +404,10 @@
       });
       var target = sections[tab];
       if (target) target.classList.add('active');
+      if (tab === 'overview') fetchOverviewStats();
       if (tab === 'knowledge') fetchKnowledge();
       if (tab === 'scraper' || tab === 'embedding') updateLastRunTimes();
+      if (tab === 'logs') fetchLogs();
       if (tab === 'health') fetchHealth();
     });
 
@@ -689,6 +703,7 @@
             showToast('Scraper started', 'success');
           }
           updateLastRunTimes();
+          fetchLogs();
         })
         .catch(function(err) {
           console.error('Scraper failed:', err);
@@ -738,6 +753,7 @@
             showToast('Embedding started', 'success');
           }
           updateLastRunTimes();
+          fetchLogs();
         })
         .catch(function(err) {
           console.error('Embedding failed:', err);
@@ -770,11 +786,12 @@
                 showEmbeddingFeedback(data.message, 'error');
                 showToast(data.message, 'error');
               } else {
-                showEmbeddingFeedback(data.message, 'success');
-                showToast('Rebuild started', 'success');
-              }
-              updateLastRunTimes();
-            })
+            showEmbeddingFeedback(data.message, 'success');
+            showToast('Rebuild started', 'success');
+          }
+          updateLastRunTimes();
+          fetchLogs();
+        })
             .catch(function(err) {
               console.error('Rebuild failed:', err);
               showEmbeddingFeedback('Failed to start rebuild', 'error');
@@ -892,6 +909,81 @@
 
     if (refreshHealthBtn) refreshHealthBtn.addEventListener('click', fetchHealth);
 
+    /* --- Overview --- */
+    function fetchOverviewStats() {
+      fetch('/api/admin/stats')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+          if (!data) return;
+          document.getElementById('overviewTotalContent').textContent = data.total_articles;
+          document.getElementById('overviewEmbedded').textContent = data.embedded_articles;
+          document.getElementById('overviewPending').textContent = data.pending_articles;
+          document.getElementById('overviewQuestions').textContent = data.questions_count;
+          document.getElementById('overviewLastScraping').textContent = data.last_scraping || 'Never';
+          document.getElementById('overviewLastEmbedding').textContent = data.last_embedding || 'Never';
+        })
+        .catch(function(err) {
+          console.error('Failed to load stats:', err);
+          showToast('Failed to load overview stats', 'error');
+        });
+
+      fetch('/api/admin/health')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+          if (!data) return;
+          document.getElementById('overviewDatabase').textContent = data.database ? 'Online' : 'Offline';
+          document.getElementById('overviewQdrant').textContent = data.qdrant ? 'Online' : 'Offline';
+        })
+        .catch(function() {});
+    }
+
+    /* --- Logs --- */
+    var refreshLogsBtn = document.getElementById('refreshLogsBtn');
+    var logsTableBody = document.getElementById('logsTableBody');
+    var logsTable = document.getElementById('logsTable');
+    var logsEmpty = document.getElementById('logsEmpty');
+    var logsStatus = document.getElementById('logsStatus');
+
+    function fetchLogs() {
+      logsTable.style.display = 'none';
+      logsEmpty.style.display = 'none';
+      logsStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Loading...';
+
+      fetch('/api/admin/logs?limit=50')
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          if (!data || data.length === 0) {
+            logsTable.style.display = 'none';
+            logsEmpty.style.display = 'block';
+            return;
+          }
+          logsTable.style.display = '';
+          logsEmpty.style.display = 'none';
+          logsTableBody.innerHTML = '';
+          data.forEach(function(row) {
+            var ts = row.timestamp ? new Date(row.timestamp).toLocaleString() : '';
+            var tr = document.createElement('tr');
+            tr.innerHTML = '<td>' + escapeHtml(ts) + '</td><td>' + escapeHtml(row.event) + '</td>';
+            logsTableBody.appendChild(tr);
+          });
+        })
+        .catch(function(err) {
+          console.error('Failed to load logs:', err);
+          logsTable.style.display = 'none';
+          logsEmpty.style.display = 'block';
+          logsEmpty.textContent = 'Failed to load logs';
+          showToast('Failed to load logs', 'error');
+        })
+        .finally(function() {
+          logsStatus.textContent = '';
+        });
+    }
+
+    if (refreshLogsBtn) refreshLogsBtn.addEventListener('click', fetchLogs);
+
     /* --- Shared --- */
     function updateLastRunTimes() {
       fetch('/api/admin/stats')
@@ -907,6 +999,7 @@
     }
 
     updateLastRunTimes();
+    fetchOverviewStats();
     fetchHealth();
   })();
 </script>
