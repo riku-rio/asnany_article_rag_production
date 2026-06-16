@@ -1,4 +1,6 @@
 import os
+import threading
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -7,6 +9,12 @@ from qdrant_client import QdrantClient, models
 from database.db import get_connection
 from database.dashboard_logger import log_event
 from database.qdrant_uploader import QDRANT_COLLECTION
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+CSV_PATH = PROJECT_ROOT / "scraper" / "articles.csv"
+
+_job_lock = threading.Lock()
+_job_running = False
 
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_TOKEN = os.getenv("QDRANT_TOKEN")
@@ -56,6 +64,120 @@ def _query_list(sql: str, params: tuple = ()) -> List[Dict[str, Any]]:
         return []
     finally:
         conn.close()
+
+
+# ======================
+# Background job helpers
+# ======================
+
+def _run_background(target_func):
+    global _job_running
+    try:
+        target_func()
+    except Exception as e:
+        print(f"Background job failed: {e}")
+    finally:
+        _job_running = False
+        _job_lock.release()
+
+
+def _start_background_job(target_func):
+    global _job_running
+    if _job_running:
+        return {"status": "busy", "message": "A maintenance job is already running"}
+    if not _job_lock.acquire(blocking=False):
+        return {"status": "busy", "message": "A maintenance job is already running"}
+    _job_running = True
+    thread = threading.Thread(target=lambda: _run_background(target_func), daemon=True)
+    thread.start()
+    return {"status": "started", "message": "Job started in background"}
+
+
+def _reset_all_is_embedded():
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("UPDATE blog SET is_embedded = 0;")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+# ======================
+# Scraper
+# ======================
+
+def run_scraper():
+    def _scrape():
+        from database.database_server import (
+            insert_blog_article,
+            load_known_urls_from_db,
+        )
+        from scraper.asnany_scraper import scrape_all_articles
+
+        log_event("scraper_started", "Scraper triggered from dashboard")
+        try:
+            known_urls = load_known_urls_from_db()
+            scrape_all_articles(
+                known_urls,
+                csv_path=CSV_PATH,
+                total_pages=0,
+                sleep_seconds=0.3,
+                on_article=insert_blog_article,
+                write_csv=False,
+            )
+            log_event("scraper_completed", "Scraper completed successfully")
+        except Exception as e:
+            log_event("scraper_failed", f"Scraper failed: {e}")
+            raise
+
+    return _start_background_job(_scrape)
+
+
+# ======================
+# Embedding
+# ======================
+
+def run_embedding():
+    def _embed():
+        from database.database_server import (
+            embed_and_upload_blog_articles,
+            export_blog_to_csv,
+        )
+
+        log_event("embedding_started", "Embedding triggered from dashboard")
+        try:
+            export_blog_to_csv(CSV_PATH)
+            embed_and_upload_blog_articles()
+            log_event("embedding_completed", "Embedding completed successfully")
+        except Exception as e:
+            log_event("embedding_failed", f"Embedding failed: {e}")
+            raise
+
+    return _start_background_job(_embed)
+
+
+# ======================
+# Rebuild
+# ======================
+
+def rebuild_everything():
+    def _rebuild():
+        from database.database_server import embed_and_upload_blog_articles
+
+        log_event("rebuild_started", "Rebuild triggered from dashboard")
+        try:
+            _reset_all_is_embedded()
+            embed_and_upload_blog_articles()
+            log_event("rebuild_completed", "Rebuild completed successfully")
+        except Exception as e:
+            log_event("rebuild_failed", f"Rebuild failed: {e}")
+            raise
+
+    return _start_background_job(_rebuild)
 
 
 # ======================

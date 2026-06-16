@@ -7,9 +7,36 @@ from database.admin_service import (
     delete_knowledge,
     get_logs,
     check_health,
+    run_scraper,
+    run_embedding,
+    rebuild_everything,
 )
 
 router = APIRouter()
+
+
+@router.post("/scrape")
+def scrape():
+    try:
+        return run_scraper()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/embedding")
+def embedding():
+    try:
+        return run_embedding()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/rebuild")
+def rebuild():
+    try:
+        return rebuild_everything()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/stats")

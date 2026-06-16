@@ -1496,12 +1496,12 @@ Refresh dashboard stats.
 
 Milestone 5 is complete when:
 
-* [] Scraper can be triggered
-* [] Embedding can be triggered
-* [] Rebuild can be triggered
-* [] Loading states work
-* [] Success states work
-* [] Failure states work
+* [x] Scraper can be triggered
+* [x] Embedding can be triggered
+* [x] Rebuild can be triggered
+* [x] Loading states work
+* [x] Success states work
+* [x] Failure states work
 
 ---
 

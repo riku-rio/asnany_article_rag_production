@@ -174,6 +174,15 @@
   .actions-cell .delete-btn { color: var(--badge-error-text); }
   .actions-cell .delete-btn:hover { border-color: var(--badge-error-text); }
 
+  .op-btn { padding: 8px 18px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; cursor: pointer; background: var(--bg-surface); color: var(--text-primary); transition: background 0.15s, border-color 0.15s; }
+  .op-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  .op-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .op-btn-danger { color: var(--badge-error-text); }
+  .op-btn-danger:hover { border-color: var(--badge-error-text); color: var(--badge-error-text); }
+  .op-status { font-size: 13px; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 6px; }
+  .op-feedback-success { background: var(--badge-success-bg); color: var(--badge-success-text); padding: 10px 14px; border-radius: 6px; font-size: 13px; }
+  .op-feedback-error { background: var(--badge-error-bg); color: var(--badge-error-text); padding: 10px 14px; border-radius: 6px; font-size: 13px; }
+
   @media (max-width: 700px) {
     .sidebar { width: 56px; }
     .sidebar-item span:not(.sidebar-icon) { display: none; }
@@ -274,13 +283,30 @@
       <section class="section" id="section-scraper">
         <h1 class="section-title">Scraper</h1>
         <p class="section-desc">Trigger article scraping</p>
-        <div class="placeholder-text">Scraper controls will appear here</div>
+        <div class="card">
+          <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">Last Scraping</div>
+          <div id="scraperLastRun" style="font-weight:500;">--</div>
+        </div>
+        <div class="card" style="display:flex;align-items:center;gap:16px;">
+          <button id="runScraperBtn" class="op-btn">&#9654; Run Scraper</button>
+          <span id="scraperStatus" class="op-status"></span>
+        </div>
+        <div id="scraperFeedback" class="card" style="display:none;"></div>
       </section>
 
       <section class="section" id="section-embedding">
         <h1 class="section-title">Embedding</h1>
         <p class="section-desc">Manage vector indexing</p>
-        <div class="placeholder-text">Embedding controls will appear here</div>
+        <div class="card">
+          <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">Last Embedding</div>
+          <div id="embeddingLastRun" style="font-weight:500;">--</div>
+        </div>
+        <div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <button id="runEmbeddingBtn" class="op-btn">&#9654; Run Embedding</button>
+          <button id="rebuildBtn" class="op-btn op-btn-danger">&#9888; Rebuild Everything</button>
+          <span id="embeddingStatus" class="op-status"></span>
+        </div>
+        <div id="embeddingFeedback" class="card" style="display:none;"></div>
       </section>
 
       <section class="section" id="section-chat-test">
@@ -333,6 +359,7 @@
       var target = sections[tab];
       if (target) target.classList.add('active');
       if (tab === 'knowledge') fetchKnowledge();
+      if (tab === 'scraper' || tab === 'embedding') updateLastRunTimes();
     });
 
     /* --- Theme --- */
@@ -597,6 +624,153 @@
         });
       }
     });
+
+    /* --- Scraper Controls --- */
+    var scraperBtn = document.getElementById('runScraperBtn');
+    var scraperStatus = document.getElementById('scraperStatus');
+    var scraperFeedback = document.getElementById('scraperFeedback');
+
+    function showScraperFeedback(message, type) {
+      scraperFeedback.style.display = 'block';
+      scraperFeedback.className = 'card op-feedback-' + type;
+      scraperFeedback.textContent = message;
+    }
+
+    function runScraper() {
+      scraperBtn.disabled = true;
+      scraperStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Running...';
+      scraperFeedback.style.display = 'none';
+      fetch('/api/admin/scrape', { method: 'POST' })
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          if (data.status === 'busy') {
+            showScraperFeedback(data.message, 'error');
+            showToast(data.message, 'error');
+          } else {
+            showScraperFeedback(data.message, 'success');
+            showToast('Scraper started', 'success');
+          }
+          updateLastRunTimes();
+        })
+        .catch(function(err) {
+          console.error('Scraper failed:', err);
+          showScraperFeedback('Failed to start scraper', 'error');
+          showToast('Failed to start scraper', 'error');
+        })
+        .finally(function() {
+          scraperBtn.disabled = false;
+          scraperStatus.textContent = '';
+        });
+    }
+
+    if (scraperBtn) scraperBtn.addEventListener('click', runScraper);
+
+    /* --- Embedding Controls --- */
+    var embeddingBtn = document.getElementById('runEmbeddingBtn');
+    var rebuildBtn = document.getElementById('rebuildBtn');
+    var embeddingStatus = document.getElementById('embeddingStatus');
+    var embeddingFeedback = document.getElementById('embeddingFeedback');
+
+    function showEmbeddingFeedback(message, type) {
+      embeddingFeedback.style.display = 'block';
+      embeddingFeedback.className = 'card op-feedback-' + type;
+      embeddingFeedback.textContent = message;
+    }
+
+    function setEmbeddingButtons(disabled) {
+      embeddingBtn.disabled = disabled;
+      rebuildBtn.disabled = disabled;
+    }
+
+    function runEmbedding() {
+      setEmbeddingButtons(true);
+      embeddingStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Running...';
+      embeddingFeedback.style.display = 'none';
+      fetch('/api/admin/embedding', { method: 'POST' })
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          if (data.status === 'busy') {
+            showEmbeddingFeedback(data.message, 'error');
+            showToast(data.message, 'error');
+          } else {
+            showEmbeddingFeedback(data.message, 'success');
+            showToast('Embedding started', 'success');
+          }
+          updateLastRunTimes();
+        })
+        .catch(function(err) {
+          console.error('Embedding failed:', err);
+          showEmbeddingFeedback('Failed to start embedding', 'error');
+          showToast('Failed to start embedding', 'error');
+        })
+        .finally(function() {
+          setEmbeddingButtons(false);
+          embeddingStatus.textContent = '';
+        });
+    }
+
+    function rebuildEverything() {
+      openModal({
+        title: 'Confirm Rebuild',
+        body: '<p>This will reset all embeddings and rebuild from scratch. This operation cannot be undone. Continue?</p>',
+        confirmText: 'Rebuild',
+        cancelText: 'Cancel',
+        onConfirm: function() {
+          setEmbeddingButtons(true);
+          embeddingStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Rebuilding...';
+          embeddingFeedback.style.display = 'none';
+          fetch('/api/admin/rebuild', { method: 'POST' })
+            .then(function(r) {
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+              return r.json();
+            })
+            .then(function(data) {
+              if (data.status === 'busy') {
+                showEmbeddingFeedback(data.message, 'error');
+                showToast(data.message, 'error');
+              } else {
+                showEmbeddingFeedback(data.message, 'success');
+                showToast('Rebuild started', 'success');
+              }
+              updateLastRunTimes();
+            })
+            .catch(function(err) {
+              console.error('Rebuild failed:', err);
+              showEmbeddingFeedback('Failed to start rebuild', 'error');
+              showToast('Failed to start rebuild', 'error');
+            })
+            .finally(function() {
+              setEmbeddingButtons(false);
+              embeddingStatus.textContent = '';
+            });
+        }
+      });
+    }
+
+    if (embeddingBtn) embeddingBtn.addEventListener('click', runEmbedding);
+    if (rebuildBtn) rebuildBtn.addEventListener('click', rebuildEverything);
+
+    /* --- Shared --- */
+    function updateLastRunTimes() {
+      fetch('/api/admin/stats')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+          if (!data) return;
+          var lastScrape = document.getElementById('scraperLastRun');
+          var lastEmbed = document.getElementById('embeddingLastRun');
+          if (lastScrape) lastScrape.textContent = data.last_scraping || 'Never';
+          if (lastEmbed) lastEmbed.textContent = data.last_embedding || 'Never';
+        })
+        .catch(function() {});
+    }
+
+    updateLastRunTimes();
   })();
 </script>
 </body>
