@@ -84,7 +84,9 @@ M5 Scraper & Embedding Controls
 
 M6 Chat Test & Health
 
-M7 Testing & Release
+M7 Overview & Logs Pages
+
+M8 Testing & Release
 ```
 
 ---
@@ -1746,17 +1748,228 @@ Milestone 6 is complete when:
 
 # MILESTONE 7
 
+# OVERVIEW & LOGS PAGES
+
+# ==================================================
+
+# Milestone Goal
+
+Build the Overview and Logs dashboard pages to display system statistics and activity history.
+
+---
+
+# Atomic Milestone 7.1
+
+## Atomic Milestone Goal
+
+Build Overview section with live KPI cards and system status fields.
+
+---
+
+### Atomic Tasks
+
+#### DG-711
+
+Create fetchOverviewStats() function.
+
+---
+
+#### DG-712
+
+Call:
+
+```http
+GET /api/admin/stats
+```
+
+---
+
+#### DG-713
+
+Render Total Content KPI card value.
+
+---
+
+#### DG-714
+
+Render Embedded KPI card value.
+
+---
+
+#### DG-715
+
+Render Pending KPI card value.
+
+---
+
+#### DG-716
+
+Render Questions Count KPI card value.
+
+---
+
+#### DG-717
+
+Render Last Scraping timestamp.
+
+---
+
+#### DG-718
+
+Render Last Embedding timestamp.
+
+---
+
+#### DG-719
+
+Add health status fields (Database status, Qdrant status) from health endpoint.
+
+---
+
+# Atomic Milestone 7.2
+
+## Atomic Milestone Goal
+
+Build Logs section with a scrollable activity log viewer.
+
+---
+
+### Atomic Tasks
+
+#### DG-721
+
+Create Logs section container with table structure.
+
+Columns:
+
+```text
+Timestamp
+Event
+```
+
+---
+
+#### DG-722
+
+Create fetchLogs() function.
+
+---
+
+#### DG-723
+
+Call:
+
+```http
+GET /api/admin/logs?limit=50
+```
+
+---
+
+#### DG-724
+
+Render log rows with formatted timestamp and event label.
+
+---
+
+#### DG-725
+
+Add Refresh button.
+
+---
+
+#### DG-726
+
+Handle empty state when no logs exist.
+
+---
+
+#### DG-727
+
+Handle API errors gracefully.
+
+---
+
+# Atomic Milestone 7.3
+
+## Atomic Milestone Goal
+
+Wire cross-section dependencies and verify live data.
+
+---
+
+### Atomic Tasks
+
+#### DG-731
+
+Auto-refresh Overview stats on tab switch.
+
+---
+
+#### DG-732
+
+Auto-refresh Logs on tab switch.
+
+---
+
+#### DG-733
+
+Trigger log refresh after scraper execution.
+
+---
+
+#### DG-734
+
+Trigger log refresh after embedding execution.
+
+---
+
+#### DG-735
+
+Trigger log refresh after rebuild execution.
+
+---
+
+#### DG-736
+
+Verify all Overview KPI cards display live data.
+
+---
+
+#### DG-737
+
+Verify Logs displays recent activity entries.
+
+---
+
+# Milestone 7 DoD
+
+Milestone 7 is complete when:
+
+* [] Overview KPI cards show live stats
+* [] Overview status fields show health data
+* [] Logs table renders entries from API
+* [] Logs refresh works
+* [] Sections auto-refresh on tab switch
+* [] Empty states display correctly
+* [] Error states display correctly
+
+---
+
+# ==================================================
+
+# MILESTONE 8
+
 # TESTING & RELEASE
 
 # ==================================================
 
 # Milestone Goal
 
-Validate Dashboard V1 and prepare it for client use.
+Validate the complete Dashboard V1 and prepare it for client use.
 
 ---
 
-# Atomic Milestone 7.1
+# Atomic Milestone 8.1
 
 ## Atomic Milestone Goal
 
@@ -1766,61 +1979,61 @@ Validate API integration.
 
 ### Atomic Tasks
 
-#### DG-711
+#### DG-811
 
 Test stats endpoint.
 
 ---
 
-#### DG-712
+#### DG-812
 
 Test knowledge endpoint.
 
 ---
 
-#### DG-713
+#### DG-813
 
 Test delete endpoint.
 
 ---
 
-#### DG-714
+#### DG-814
 
 Test logs endpoint.
 
 ---
 
-#### DG-715
+#### DG-815
 
 Test scraper endpoint.
 
 ---
 
-#### DG-716
+#### DG-816
 
 Test embedding endpoint.
 
 ---
 
-#### DG-717
+#### DG-817
 
 Test rebuild endpoint.
 
 ---
 
-#### DG-718
+#### DG-818
 
 Test health endpoint.
 
 ---
 
-#### DG-719
+#### DG-819
 
 Test chat endpoint.
 
 ---
 
-# Atomic Milestone 7.2
+# Atomic Milestone 8.2
 
 ## Atomic Milestone Goal
 
@@ -1830,43 +2043,43 @@ Validate UI flows.
 
 ### Atomic Tasks
 
-#### DG-721
+#### DG-821
 
 Test navigation.
 
 ---
 
-#### DG-722
+#### DG-822
 
 Test modal behavior.
 
 ---
 
-#### DG-723
+#### DG-823
 
 Test notifications.
 
 ---
 
-#### DG-724
+#### DG-824
 
 Test loading states.
 
 ---
 
-#### DG-725
+#### DG-825
 
 Test empty states.
 
 ---
 
-#### DG-726
+#### DG-826
 
 Test error states.
 
 ---
 
-# Atomic Milestone 7.3
+# Atomic Milestone 8.3
 
 ## Atomic Milestone Goal
 
@@ -1876,55 +2089,55 @@ Validate dashboard operations.
 
 ### Atomic Tasks
 
-#### DG-731
+#### DG-831
 
 Run scraper from dashboard.
 
 ---
 
-#### DG-732
+#### DG-832
 
 Run embedding from dashboard.
 
 ---
 
-#### DG-733
+#### DG-833
 
 Run rebuild from dashboard.
 
 ---
 
-#### DG-734
+#### DG-834
 
 Open knowledge item.
 
 ---
 
-#### DG-735
+#### DG-835
 
 Delete knowledge item.
 
 ---
 
-#### DG-736
+#### DG-836
 
 Run chat test.
 
 ---
 
-#### DG-737
+#### DG-837
 
 Verify logs update.
 
 ---
 
-#### DG-738
+#### DG-838
 
 Verify stats update.
 
 ---
 
-# Atomic Milestone 7.4
+# Atomic Milestone 8.4
 
 ## Atomic Milestone Goal
 
@@ -1934,51 +2147,51 @@ Prepare release.
 
 ### Atomic Tasks
 
-#### DG-741
+#### DG-841
 
 Remove unused code.
 
 ---
 
-#### DG-742
+#### DG-842
 
 Remove debug logs.
 
 ---
 
-#### DG-743
+#### DG-843
 
 Review API.md compliance.
 
 ---
 
-#### DG-744
+#### DG-844
 
 Review UI.md compliance.
 
 ---
 
-#### DG-745
+#### DG-845
 
 Review DB_SCHEMA.md compliance.
 
 ---
 
-#### DG-746
+#### DG-846
 
 Verify single-file requirement.
 
 ---
 
-#### DG-747
+#### DG-847
 
 Create backup before release.
 
 ---
 
-# Milestone 7 DoD
+# Milestone 8 DoD
 
-Milestone 7 is complete when:
+Milestone 8 is complete when:
 
 * [] All endpoints tested
 * [] All UI flows tested
