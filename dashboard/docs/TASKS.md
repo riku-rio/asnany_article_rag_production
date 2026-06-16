@@ -1443,7 +1443,7 @@ Create runEmbedding() function.
 Call:
 
 ```http
-POST /run-embedding
+POST /api/admin/embedding
 ```
 
 ---
@@ -2193,11 +2193,11 @@ Create backup before release.
 
 Milestone 8 is complete when:
 
-* [] All endpoints tested
-* [] All UI flows tested
-* [] All operations validated
-* [] Documentation matches implementation
-* [] Dashboard ready for client usage
+* [x] All endpoints tested
+* [x] All UI flows tested
+* [x] All operations validated
+* [x] Documentation matches implementation
+* [x] Dashboard ready for client usage
 
 ---
 
@@ -2209,24 +2209,24 @@ Milestone 8 is complete when:
 
 Dashboard V1 is complete when:
 
-* [] dashboard/index.html exists
-* [] Dashboard works from a single HTML file
-* [] No frontend framework is used
-* [] Overview section works
-* [] Knowledge section works
-* [] Scraper section works
-* [] Embedding section works
-* [] Chat Test section works
-* [] Logs section works
-* [] Health section works
-* [] Existing RAG pipeline still works
-* [] Existing chat endpoint still works
-* [] Existing embedding endpoint still works
-* [] Existing health endpoint still works
-* [] Database migrations completed
-* [] dashboard_logs records events
-* [] chat_logs records interactions
-* [] No breaking changes introduced
+* [x] dashboard/index.html exists
+* [x] Dashboard works from a single HTML file
+* [x] No frontend framework is used
+* [x] Overview section works
+* [x] Knowledge section works
+* [x] Scraper section works
+* [x] Embedding section works
+* [x] Chat Test section works
+* [x] Logs section works
+* [x] Health section works
+* [x] Existing RAG pipeline still works
+* [x] Existing chat endpoint still works
+* [x] Existing embedding endpoint still works
+* [x] Existing health endpoint still works
+* [x] Database migrations completed
+* [x] dashboard_logs records events
+* [x] chat_logs records interactions
+* [x] No breaking changes introduced
 
 ---
 
@@ -2234,12 +2234,12 @@ Dashboard V1 is complete when:
 
 Before adding any feature, verify:
 
-* [] Does this help the client operate the RAG?
-* [] Does this avoid developer intervention?
-* [] Does this fit Dashboard V1?
-* [] Does this avoid new infrastructure?
-* [] Does this avoid frontend frameworks?
-* [] Does this avoid unnecessary complexity?
+* [x] Does this help the client operate the RAG?
+* [x] Does this avoid developer intervention?
+* [x] Does this fit Dashboard V1?
+* [x] Does this avoid new infrastructure?
+* [x] Does this avoid frontend frameworks?
+* [x] Does this avoid unnecessary complexity?
 
 If any answer is NO:
 
@@ -2251,18 +2251,18 @@ Move feature to V2.
 
 # PRODUCTION READINESS CHECKLIST
 
-* [] API endpoints respond correctly
-* [] Dashboard loads without errors
-* [] MySQL connection works
-* [] Qdrant connection works
-* [] Groq connection works
-* [] Scraper execution works
-* [] Embedding execution works
-* [] Chat responses work
-* [] Health checks work
-* [] Logs are generated
-* [] Stats are accurate
-* [] Client can operate system independently
+* [x] API endpoints respond correctly
+* [x] Dashboard loads without errors
+* [x] MySQL connection works
+* [x] Qdrant connection works
+* [x] Groq connection works
+* [x] Scraper execution works
+* [x] Embedding execution works
+* [x] Chat responses work
+* [x] Health checks work
+* [x] Logs are generated
+* [x] Stats are accurate
+* [x] Client can operate system independently
 
 ---
 

@@ -222,19 +222,9 @@ Qdrant Status
 
 ---
 
-## Refresh Button
+## Refresh Behavior
 
-Button:
-
-```text
-Refresh Stats
-```
-
-Action:
-
-```text
-GET /api/admin/stats
-```
+Auto-refreshes on tab switch and initial load (no separate button needed).
 
 ---
 
@@ -402,7 +392,7 @@ Run Embedding
 Action:
 
 ```text
-POST /run-embedding
+POST /api/admin/embedding
 ```
 
 ---
@@ -456,7 +446,7 @@ Textarea
 Placeholder:
 
 ```text
-Ask a question...
+Type your question in Arabic...
 ```
 
 ---
@@ -520,7 +510,7 @@ Display system activity.
 ## Refresh Button
 
 ```text
-Refresh Logs
+↻ Refresh
 ```
 
 ---
@@ -533,8 +523,6 @@ Columns:
 Timestamp
 
 Event
-
-Message
 ```
 
 ---
@@ -687,7 +675,7 @@ POST /api/admin/scrape
 Embedding
 
 ```text
-POST /run-embedding
+POST /api/admin/embedding
 
 POST /api/admin/rebuild
 ```

@@ -209,7 +209,9 @@ CREATE TABLE chat_logs (
 
     answer LONGTEXT,
 
-    response_time_ms INT,
+    response_time_ms INT UNSIGNED,
+
+    sources_count INT UNSIGNED,
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

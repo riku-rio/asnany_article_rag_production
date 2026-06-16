@@ -31,7 +31,7 @@ Examples:
 ```text
 /api/admin/stats
 /api/admin/health
-/api/admin/embed
+/api/admin/embedding
 ```
 
 ---
@@ -262,6 +262,48 @@ Must:
 
 ---
 
+# Run Embedding
+
+Starts embedding execution.
+
+---
+
+## Request
+
+```http
+POST /api/admin/embedding
+```
+
+---
+
+## Response
+
+```json
+{
+  "status": "started",
+  "message": "Job started in background"
+}
+```
+
+When a job is already running:
+
+```json
+{
+  "status": "busy",
+  "message": "A maintenance job is already running"
+}
+```
+
+---
+
+## Expected Behavior
+
+Runs existing embedding pipeline.
+
+Must not block request.
+
+---
+
 # Run Scraper
 
 Starts scraper execution.
@@ -280,8 +322,17 @@ POST /api/admin/scrape
 
 ```json
 {
-  "success": true,
-  "message": "Scraper started"
+  "status": "started",
+  "message": "Job started in background"
+}
+```
+
+When a job is already running:
+
+```json
+{
+  "status": "busy",
+  "message": "A maintenance job is already running"
 }
 ```
 
@@ -313,8 +364,17 @@ POST /api/admin/rebuild
 
 ```json
 {
-  "success": true,
-  "message": "Rebuild started"
+  "status": "started",
+  "message": "Job started in background"
+}
+```
+
+When a job is already running:
+
+```json
+{
+  "status": "busy",
+  "message": "A maintenance job is already running"
 }
 ```
 
@@ -535,6 +595,8 @@ DELETE /api/admin/knowledge/{id}
 
 POST   /api/admin/scrape
 
+POST   /api/admin/embedding
+
 POST   /api/admin/rebuild
 
 GET    /api/admin/logs
@@ -547,7 +609,7 @@ GET    /api/admin/health
 Total New Endpoints:
 
 ```text
-8
+9
 ```
 
 Total Dashboard Complexity:
