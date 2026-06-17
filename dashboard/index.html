@@ -1,0 +1,1802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG Dashboard</title>
+<style>
+  :root {
+    --bg-body: #f5f6f8;
+    --bg-surface: #ffffff;
+    --bg-sidebar: #ffffff;
+    --bg-sidebar-active: #eef1ff;
+    --bg-sidebar-hover: #f0f1f4;
+    --bg-card: #ffffff;
+    --border-color: #e0e0e0;
+    --text-primary: #1c1c1c;
+    --text-heading: #1a1a2e;
+    --text-secondary: #888888;
+    --text-sidebar: #555555;
+    --color-accent: #3a56e4;
+    --badge-success-bg: #e8f5e9;
+    --badge-success-text: #2e7d32;
+    --badge-warning-bg: #fff3e0;
+    --badge-warning-text: #e65100;
+    --badge-error-bg: #ffebee;
+    --badge-error-text: #c62828;
+  }
+
+  html.theme-dark {
+    --bg-body: #0f0f1a;
+    --bg-surface: #1a1a2e;
+    --bg-sidebar: #16162a;
+    --bg-sidebar-active: #25254a;
+    --bg-sidebar-hover: #1e1e38;
+    --bg-card: #1a1a2e;
+    --border-color: #2a2a44;
+    --text-primary: #e8e8f0;
+    --text-heading: #f0f0ff;
+    --text-secondary: #8888aa;
+    --text-sidebar: #6666aa;
+    --color-accent: #8b9dff;
+    --badge-success-bg: #1b3b1b;
+    --badge-success-text: #81c784;
+    --badge-warning-bg: #3b2e1b;
+    --badge-warning-text: #ffb74d;
+    --badge-error-bg: #3b1b1b;
+    --badge-error-text: #ef9a9a;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg-body); color: var(--text-primary); }
+  a { color: inherit; text-decoration: none; }
+
+  .app { display: flex; flex-direction: column; height: 100vh; }
+
+  .header { display: flex; align-items: center; justify-content: space-between; height: 52px; padding: 0 24px; background: var(--bg-surface); border-bottom: 1px solid var(--border-color); flex-shrink: 0; }
+  .header-title { font-size: 16px; font-weight: 600; color: var(--text-heading); }
+  .header-status { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #4caf50; }
+  .header-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4caf50; }
+  .header-actions { display: flex; align-items: center; gap: 8px; }
+  .header-user { font-size: 13px; color: var(--text-secondary); padding: 0 8px; }
+  .header-logout-btn { background: none; border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; color: var(--badge-error-text); transition: background 0.15s; }
+  .header-logout-btn:hover { background: var(--badge-error-bg); }
+  .theme-toggle { background: none; border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 16px; line-height: 1; color: var(--text-secondary); transition: background 0.15s; }
+  .theme-toggle:hover { background: var(--bg-sidebar-hover); }
+
+  .body { display: flex; flex: 1; overflow: hidden; }
+
+  .sidebar { width: 220px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); padding: 12px 0; flex-shrink: 0; overflow-y: auto; }
+  .sidebar-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; font-size: 14px; color: var(--text-sidebar); cursor: pointer; transition: background 0.15s, color 0.15s; border: none; background: none; width: 100%; text-align: left; }
+  .sidebar-item:hover { background: var(--bg-sidebar-hover); color: var(--text-heading); }
+  .sidebar-item.active { background: var(--bg-sidebar-active); color: var(--color-accent); font-weight: 500; }
+  .sidebar-icon { font-size: 18px; width: 22px; text-align: center; flex-shrink: 0; }
+
+  .content { flex: 1; padding: 28px 32px; overflow-y: auto; background: var(--bg-body); }
+  .section { display: none; }
+  .section.active { display: block; }
+  .section-title { font-size: 22px; font-weight: 600; color: var(--text-heading); margin-bottom: 4px; }
+  .section-desc { font-size: 14px; color: var(--text-secondary); margin-bottom: 24px; }
+
+  .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; }
+  .card + .card { margin-top: 16px; }
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .kpi-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; }
+  .kpi-label { font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+  .kpi-value { font-size: 28px; font-weight: 600; color: var(--text-heading); }
+
+  .placeholder-text { color: var(--text-secondary); font-size: 14px; text-align: center; padding: 48px 0; }
+
+  /* --- Login Screen --- */
+  #loginScreen {
+    position: fixed; inset: 0; z-index: 2000;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg-body);
+  }
+  #loginScreen.hidden { display: none; }
+  .login-box {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 40px 36px;
+    width: min(380px, calc(100vw - 32px));
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+  }
+  .login-title { font-size: 20px; font-weight: 600; color: var(--text-heading); margin-bottom: 4px; text-align: center; }
+  .login-subtitle { font-size: 14px; color: var(--text-secondary); margin-bottom: 28px; text-align: center; }
+  .login-field { margin-bottom: 16px; }
+  .login-field label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+  .login-field input { width: 100%; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-surface); color: var(--text-primary); outline: none; }
+  .login-field input:focus { border-color: var(--color-accent); }
+  .login-btn { width: 100%; padding: 10px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; background: var(--color-accent); color: #fff; transition: opacity 0.15s; }
+  .login-btn:hover { opacity: 0.9; }
+  .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .login-error { font-size: 13px; color: var(--badge-error-text); margin-top: 12px; text-align: center; display: none; }
+
+  /* --- Chat Test --- */
+  #chatQuery { width:100%; border:1px solid var(--border-color); border-radius:6px; padding:10px 12px; font-size:15px; font-family:inherit; resize:vertical; background:var(--bg-surface); color:var(--text-primary); line-height:1.6; }
+  #chatQuery:focus { outline:none; border-color:var(--color-accent); }
+  .chat-section-label { font-weight:600; margin-bottom:8px; color:var(--text-heading); }
+  .chat-reply { line-height:1.7; white-space:pre-wrap; color:var(--text-primary); }
+  #chatSources ul { margin:0; padding-left:20px; }
+  #chatSources li { margin-bottom:6px; font-size:14px; }
+  #chatSources a { color:var(--color-accent); text-decoration:none; }
+  #chatSources a:hover { text-decoration:underline; }
+  #chatSources .empty-state { padding:12px 0; }
+
+  /* --- Health --- */
+  .health-card { background:var(--bg-card); border:1px solid var(--border-color); border-radius:8px; padding:20px; display:flex; flex-direction:column; gap:8px; }
+  .health-label { font-size:13px; color:var(--text-secondary); }
+  .health-status { font-size:15px; font-weight:500; }
+
+  /* --- Utilities --- */
+  .spinner { width: 24px; height: 24px; border: 3px solid var(--border-color); border-top-color: var(--color-accent); border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .toast-container { position: fixed; top: 16px; right: 16px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .toast { padding: 12px 20px; border-radius: 6px; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: toast-in 0.3s ease; max-width: 360px; pointer-events: auto; }
+  .toast-success { background: #4caf50; color: #fff; }
+  .toast-error { background: #f44336; color: #fff; }
+  @keyframes toast-in { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 999; }
+  .modal-box {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 24px;
+    width: min(480px, calc(100vw - 32px));
+    min-width: 0;
+    max-width: calc(100vw - 32px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    overflow: hidden;
+  }
+
+  .modal-box h2 {
+    font-size: 18px;
+    color: var(--text-heading);
+    margin-bottom: 8px;
+    overflow-wrap: anywhere;
+  }
+
+  .modal-box p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  .modal-body {
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .modal-url-line {
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .modal-url {
+    display: inline-block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-wrap: break-word;
+    word-break: break-all;
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-secondary); padding: 4px; line-height: 1; }
+  .modal-close:hover { color: var(--text-heading); }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; line-height: 1.4; }
+  .badge-success { background: var(--badge-success-bg); color: var(--badge-success-text); }
+  .badge-warning { background: var(--badge-warning-bg); color: var(--badge-warning-text); }
+  .badge-error { background: var(--badge-error-bg); color: var(--badge-error-text); }
+
+  .empty-state { text-align: center; padding: 48px 16px; color: var(--text-secondary); font-size: 14px; }
+
+  .knowledge-search { width: 100%; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-surface); color: var(--text-primary); margin-bottom: 16px; outline: none; }
+  .knowledge-search:focus { border-color: var(--color-accent); }
+  .knowledge-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .knowledge-table th { text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--border-color); color: var(--text-secondary); font-weight: 500; white-space: nowrap; }
+  .knowledge-table td { padding: 10px 12px; border-bottom: 1px solid var(--border-color); }
+  .knowledge-table tbody tr:hover td { background: var(--bg-sidebar-hover); }
+  .knowledge-table .truncate { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+  .actions-cell { white-space: nowrap; }
+  .actions-cell button { padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px; cursor: pointer; background: var(--bg-surface); color: var(--text-primary); }
+  .actions-cell button:hover { background: var(--bg-sidebar-hover); }
+  .actions-cell .view-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  .actions-cell .delete-btn { color: var(--badge-error-text); }
+  .actions-cell .delete-btn:hover { border-color: var(--badge-error-text); }
+
+  .op-btn { padding: 8px 18px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; cursor: pointer; background: var(--bg-surface); color: var(--text-primary); transition: background 0.15s, border-color 0.15s; }
+  .op-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  .op-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .op-btn-danger { color: var(--badge-error-text); }
+  .op-btn-danger:hover { border-color: var(--badge-error-text); color: var(--badge-error-text); }
+  .op-btn-add { background: #4caf50; color: #fff; border-color: #4caf50; white-space: nowrap; flex-shrink: 0; }
+  .op-btn-add:hover { background: #43a047; border-color: #43a047; color: #fff; }
+  .op-btn-primary { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+  .op-btn-primary:hover { opacity: 0.9; color: #fff; }
+  .modal-input { width: 100%; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-surface); color: var(--text-primary); outline: none; }
+  .modal-input:focus { border-color: var(--color-accent); }
+  .modal-select { width: 100%; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-surface); color: var(--text-primary); outline: none; }
+  .modal-select:focus { border-color: var(--color-accent); }
+  .op-status { font-size: 13px; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 6px; }
+  .op-feedback-success { background: var(--badge-success-bg); color: var(--badge-success-text); padding: 10px 14px; border-radius: 6px; font-size: 13px; }
+  .op-feedback-error { background: var(--badge-error-bg); color: var(--badge-error-text); padding: 10px 14px; border-radius: 6px; font-size: 13px; }
+
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+  .form-group .modal-input,
+  .form-group .modal-select { margin-top: 0; }
+
+  .user-role-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+  .user-role-badge.owner { background: #e8eaf6; color: #283593; }
+  .user-role-badge.admin { background: var(--badge-success-bg); color: var(--badge-success-text); }
+  html.theme-dark .user-role-badge.owner { background: #1a237e; color: #9fa8da; }
+
+  @media (max-width: 700px) {
+    .sidebar { width: 56px; }
+    .sidebar-item span:not(.sidebar-icon) { display: none; }
+    .sidebar-item { justify-content: center; padding: 12px; }
+    .content { padding: 20px 16px; }
+    .kpi-row { grid-template-columns: 1fr 1fr; }
+    #knowledgeTableContainer { overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+<!-- Login Screen -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-title">RAG Dashboard</div>
+    <div class="login-subtitle">Sign in to continue</div>
+    <div class="login-field">
+      <label for="loginUsername">Username</label>
+      <input type="text" id="loginUsername" placeholder="Enter username" autocomplete="username" autofocus>
+    </div>
+    <div class="login-field">
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" placeholder="Enter password" autocomplete="current-password">
+    </div>
+    <button id="loginBtn" class="login-btn">Sign In</button>
+    <div id="loginError" class="login-error"></div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div class="app" id="dashboardApp">
+  <header class="header">
+    <div class="header-title">RAG Dashboard</div>
+    <div class="header-actions">
+      <span class="header-user" id="headerUserInfo"></span>
+      <button class="header-logout-btn" id="logoutBtn" style="display:none;">Logout</button>
+      <div class="header-status">
+        <span class="header-status-dot"></span>
+        Online
+      </div>
+      <button class="theme-toggle" id="themeToggle" title="System theme">&#x1F5A5;</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <nav class="sidebar" id="sidebar">
+      <button class="sidebar-item active" data-tab="overview">
+        <span class="sidebar-icon">&#9632;</span>
+        <span>Overview</span>
+      </button>
+      <button class="sidebar-item" data-tab="knowledge">
+        <span class="sidebar-icon">&#9776;</span>
+        <span>Knowledge</span>
+      </button>
+      <button class="sidebar-item" data-tab="scraper">
+        <span class="sidebar-icon">&#8595;</span>
+        <span>Scraper</span>
+      </button>
+      <button class="sidebar-item" data-tab="embedding">
+        <span class="sidebar-icon">&#9851;</span>
+        <span>Embedding</span>
+      </button>
+      <button class="sidebar-item" data-tab="chat-test">
+        <span class="sidebar-icon">&#9993;</span>
+        <span>Chat Test</span>
+      </button>
+      <button class="sidebar-item" data-tab="users">
+        <span class="sidebar-icon">&#9737;</span>
+        <span>Users</span>
+      </button>
+      <button class="sidebar-item" data-tab="logs">
+        <span class="sidebar-icon">&#9776;</span>
+        <span>Logs</span>
+      </button>
+      <button class="sidebar-item" data-tab="health">
+        <span class="sidebar-icon">&#10003;</span>
+        <span>Health</span>
+      </button>
+    </nav>
+
+    <main class="content" id="content">
+      <section class="section active" id="section-overview">
+        <h1 class="section-title">Overview</h1>
+        <p class="section-desc">System summary at a glance</p>
+        <div class="kpi-row">
+          <div class="kpi-card"><div class="kpi-label">Total Content</div><div class="kpi-value" id="overviewTotalContent">--</div></div>
+          <div class="kpi-card"><div class="kpi-label">Embedded</div><div class="kpi-value" id="overviewEmbedded">--</div></div>
+          <div class="kpi-card"><div class="kpi-label">Pending</div><div class="kpi-value" id="overviewPending">--</div></div>
+          <div class="kpi-card"><div class="kpi-label">Questions</div><div class="kpi-value" id="overviewQuestions">--</div></div>
+        </div>
+        <div class="card">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div><div style="font-size:13px;color:var(--text-secondary);">Last Scraping</div><div style="font-weight:500;margin-top:2px;" id="overviewLastScraping">--</div></div>
+            <div><div style="font-size:13px;color:var(--text-secondary);">Last Embedding</div><div style="font-weight:500;margin-top:2px;" id="overviewLastEmbedding">--</div></div>
+            <div><div style="font-size:13px;color:var(--text-secondary);">Database</div><div style="font-weight:500;margin-top:2px;" id="overviewDatabase">--</div></div>
+            <div><div style="font-size:13px;color:var(--text-secondary);">Qdrant</div><div style="font-weight:500;margin-top:2px;" id="overviewQdrant">--</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="section-knowledge">
+        <h1 class="section-title">Knowledge</h1>
+        <p class="section-desc">Browse and manage knowledge entries</p>
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <input type="text" id="knowledgeSearch" class="knowledge-search" style="margin-bottom:0;flex:1;" placeholder="Search knowledge...">
+          <button id="addKnowledgeBtn" class="op-btn op-btn-add">+ Add Knowledge</button>
+        </div>
+        <div id="knowledgeTableContainer">
+          <table class="knowledge-table" id="knowledgeTable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>URL</th>
+                <th>Embedded</th>
+                <th>Created At</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="knowledgeTableBody"></tbody>
+          </table>
+          <div id="knowledgeEmpty" class="empty-state" style="display:none;">No knowledge entries found</div>
+        </div>
+      </section>
+
+      <section class="section" id="section-scraper">
+        <h1 class="section-title">Scraper</h1>
+        <p class="section-desc">Trigger article scraping</p>
+        <div class="card">
+          <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">Last Scraping</div>
+          <div id="scraperLastRun" style="font-weight:500;">--</div>
+        </div>
+        <div class="card" style="display:flex;align-items:center;gap:16px;">
+          <button id="runScraperBtn" class="op-btn">&#9654; Run Scraper</button>
+          <span id="scraperStatus" class="op-status"></span>
+        </div>
+        <div id="scraperFeedback" class="card" style="display:none;"></div>
+      </section>
+
+      <section class="section" id="section-embedding">
+        <h1 class="section-title">Embedding</h1>
+        <p class="section-desc">Manage vector indexing</p>
+        <div class="card">
+          <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">Last Embedding</div>
+          <div id="embeddingLastRun" style="font-weight:500;">--</div>
+        </div>
+        <div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <button id="runEmbeddingBtn" class="op-btn">&#9654; Run Embedding</button>
+          <button id="rebuildBtn" class="op-btn op-btn-danger">&#9888; Rebuild Everything</button>
+          <span id="embeddingStatus" class="op-status"></span>
+        </div>
+        <div id="embeddingFeedback" class="card" style="display:none;"></div>
+      </section>
+
+      <section class="section" id="section-chat-test">
+        <h1 class="section-title">Chat Test</h1>
+        <p class="section-desc">Test the AI chatbot</p>
+
+        <div class="card" style="display:flex;flex-direction:column;gap:12px;">
+          <textarea id="chatQuery" rows="4" placeholder="Type your question in Arabic..."></textarea>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <button id="askBtn" class="op-btn">&#9654; Ask</button>
+            <span id="chatStatus" class="op-status"></span>
+          </div>
+        </div>
+
+        <div id="chatResponseCard" class="card" style="display:none;">
+          <div class="chat-section-label">Response</div>
+          <div id="chatReply" class="chat-reply"></div>
+        </div>
+
+        <div id="chatSourcesCard" class="card" style="display:none;">
+          <div class="chat-section-label">Sources</div>
+          <div id="chatSources"></div>
+        </div>
+      </section>
+
+      <section class="section" id="section-users">
+        <h1 class="section-title">Users</h1>
+        <p class="section-desc">Manage dashboard users</p>
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <button id="addUserBtn" class="op-btn op-btn-add">+ Add User</button>
+          <span id="usersStatus" class="op-status"></span>
+        </div>
+        <div id="usersTableContainer">
+          <table class="knowledge-table" id="usersTable">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Username</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Last Login</th>
+                <th>Created At</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody"></tbody>
+          </table>
+          <div id="usersEmpty" class="empty-state" style="display:none;">No users found</div>
+        </div>
+      </section>
+
+      <section class="section" id="section-logs">
+        <h1 class="section-title">Logs</h1>
+        <p class="section-desc">System activity log</p>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+          <button id="refreshLogsBtn" class="op-btn">&#x21bb; Refresh</button>
+          <span id="logsStatus" class="op-status"></span>
+        </div>
+        <div id="logsTableContainer">
+          <table class="knowledge-table" id="logsTable">
+            <thead>
+              <tr><th>Timestamp</th><th>Event</th></tr>
+            </thead>
+            <tbody id="logsTableBody"></tbody>
+          </table>
+          <div id="logsEmpty" class="empty-state" style="display:none;">No log entries yet</div>
+        </div>
+      </section>
+
+      <section class="section" id="section-health">
+        <h1 class="section-title">Health</h1>
+        <p class="section-desc">System component status</p>
+        <button id="refreshHealthBtn" class="op-btn" style="margin-bottom:16px;">&#x21bb; Refresh</button>
+        <div id="healthCards" class="kpi-row"></div>
+      </section>
+    </main>
+  </div>
+  <div class="toast-container" id="toastContainer"></div>
+</div>
+
+<script>
+  (function() {
+    /* ==================== Auth State ==================== */
+    var currentUser = null;
+
+    /* ==================== Utilities ==================== */
+    window.showSpinner = function(container) {
+      var el = document.createElement('div');
+      el.className = 'spinner';
+      el.id = 'spinner-' + Math.random().toString(36).slice(2);
+      container.appendChild(el);
+      return el;
+    };
+    window.hideSpinner = function(spinner) {
+      if (spinner && spinner.parentNode) spinner.parentNode.removeChild(spinner);
+    };
+    window.showToast = function(message, type) {
+      type = type || 'success';
+      var container = document.getElementById('toastContainer');
+      if (!container) return;
+      var toast = document.createElement('div');
+      toast.className = 'toast toast-' + type;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(function() {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, type === 'error' ? 5000 : 3000);
+    };
+    window.openModal = function(opts) {
+      opts = opts || {};
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeModal(overlay);
+      });
+      var box = document.createElement('div');
+      box.className = 'modal-box';
+      box.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">' +
+          '<h2 style="margin:0;">' + (opts.title || '') + '</h2>' +
+          '<button class="modal-close" style="margin-top:-4px;">&times;</button>' +
+        '</div>' +
+        '<div class="modal-body">' + (opts.body || '') + '</div>' +
+        (opts.confirmText || opts.cancelText
+          ? '<div class="modal-actions" style="margin-top:16px;">' +
+            (opts.cancelText ? '<button class="sidebar-item" style="width:auto;padding:6px 16px;justify-content:center;">' + opts.cancelText + '</button>' : '') +
+            (opts.confirmText ? '<button class="sidebar-item active" style="width:auto;padding:6px 16px;justify-content:center;">' + opts.confirmText + '</button>' : '') +
+          '</div>'
+          : '');
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+      box.querySelector('.modal-close').addEventListener('click', function() { closeModal(overlay); });
+      var cancelBtn = box.querySelector('.modal-actions .sidebar-item:first-child');
+      if (cancelBtn) cancelBtn.addEventListener('click', function() { closeModal(overlay); });
+      var confirmBtn = box.querySelector('.modal-actions .sidebar-item.active');
+      if (confirmBtn) confirmBtn.addEventListener('click', function() {
+        if (opts.onConfirm) opts.onConfirm();
+        closeModal(overlay);
+      });
+      return overlay;
+    };
+    window.closeModal = function(overlay) {
+      if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    };
+    window.createEmptyState = function(message) {
+      return '<div class="empty-state">' + (message || 'No data available') + '</div>';
+    };
+    window.createBadge = function(text, variant) {
+      return '<span class="badge badge-' + (variant || 'success') + '">' + text + '</span>';
+    };
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      var div = document.createElement('div');
+      div.appendChild(document.createTextNode(str));
+      return div.innerHTML;
+    }
+
+    function getErrorMessage(data) {
+      if (!data) return 'Unknown error';
+      if (data.message) return data.message;
+      if (typeof data.detail === 'string') return data.detail;
+      if (data.detail && data.detail.message) return data.detail.message;
+      if (data.detail && typeof data.detail === 'object') return JSON.stringify(data.detail);
+      return 'Unknown error';
+    }
+
+    /* ==================== Auth ==================== */
+    var loginScreen = document.getElementById('loginScreen');
+    var dashboardApp = document.getElementById('dashboardApp');
+    var loginUsername = document.getElementById('loginUsername');
+    var loginPassword = document.getElementById('loginPassword');
+    var loginBtn = document.getElementById('loginBtn');
+    var loginError = document.getElementById('loginError');
+    var logoutBtn = document.getElementById('logoutBtn');
+    var headerUserInfo = document.getElementById('headerUserInfo');
+
+    function showDashboard(user) {
+      currentUser = user;
+      loginScreen.classList.add('hidden');
+      dashboardApp.style.display = 'flex';
+      logoutBtn.style.display = '';
+      headerUserInfo.textContent = (user.display_name || user.username) + ' (' + user.role + ')';
+      loginError.style.display = 'none';
+      initDashboard();
+      updateLastRunTimes();
+      fetchOverviewStats();
+      fetchHealth();
+    }
+
+    function checkAuth() {
+      fetch('/api/admin/auth/me')
+        .then(function(r) {
+          if (!r.ok) {
+            showLogin();
+            return null;
+          }
+          return r.json();
+        })
+        .then(function(data) {
+          if (data && data.success && data.user) {
+            showDashboard(data.user);
+          } else {
+            showLogin();
+          }
+        })
+        .catch(function() {
+          showLogin();
+        });
+    }
+
+    function doLogin() {
+      var username = loginUsername.value.trim();
+      var password = loginPassword.value;
+
+      if (!username || !password) {
+        loginError.textContent = 'Please enter username and password';
+        loginError.style.display = 'block';
+        return;
+      }
+
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Signing in...';
+      loginError.style.display = 'none';
+
+      fetch('/api/admin/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username, password: password })
+      })
+        .then(function(r) {
+          return r.json().then(function(data) {
+            if (!r.ok) {
+              throw new Error(getErrorMessage(data) || 'Invalid username or password');
+            }
+            return data;
+          });
+        })
+        .then(function(data) {
+          if (data.success && data.user) {
+            showDashboard(data.user);
+          } else {
+            throw new Error(data.message || 'Login failed');
+          }
+        })
+        .catch(function(err) {
+          loginError.textContent = err.message || 'Invalid username or password';
+          loginError.style.display = 'block';
+        })
+        .finally(function() {
+          loginBtn.disabled = false;
+          loginBtn.textContent = 'Sign In';
+        });
+    }
+
+    function doLogout() {
+      fetch('/api/admin/auth/logout', { method: 'POST' })
+        .then(function() {
+          currentUser = null;
+          showLogin();
+        })
+        .catch(function() {
+          currentUser = null;
+          showLogin();
+        });
+    }
+
+    function showLogin() {
+      currentUser = null;
+      loginScreen.classList.remove('hidden');
+      dashboardApp.style.display = 'none';
+      logoutBtn.style.display = 'none';
+      headerUserInfo.textContent = '';
+      loginError.style.display = 'none';
+      loginUsername.value = '';
+      loginPassword.value = '';
+      loginUsername.focus();
+    }
+
+    loginBtn.addEventListener('click', doLogin);
+    loginPassword.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') doLogin();
+    });
+    loginUsername.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') doLogin();
+    });
+    logoutBtn.addEventListener('click', doLogout);
+
+    /* ==================== Init Check ==================== */
+    checkAuth();
+
+    /* ==================== Dashboard UI ==================== */
+    var sidebar = document.getElementById('sidebar');
+    var sections = {
+      overview: document.getElementById('section-overview'),
+      knowledge: document.getElementById('section-knowledge'),
+      scraper: document.getElementById('section-scraper'),
+      embedding: document.getElementById('section-embedding'),
+      'chat-test': document.getElementById('section-chat-test'),
+      users: document.getElementById('section-users'),
+      logs: document.getElementById('section-logs'),
+      health: document.getElementById('section-health')
+    };
+    var _initialized = false;
+
+    function initDashboard() {
+      if (_initialized) return;
+      _initialized = true;
+      bindSidebar();
+      bindTheme();
+      bindKnowledge();
+      bindScraper();
+      bindEmbedding();
+      bindChat();
+      bindHealth();
+      bindLogs();
+      bindUsers();
+    }
+
+    function bindSidebar() {
+      sidebar.addEventListener('click', function(e) {
+        var btn = e.target.closest('.sidebar-item');
+        if (!btn) return;
+        var tab = btn.getAttribute('data-tab');
+        if (!tab) return;
+        sidebar.querySelectorAll('.sidebar-item').forEach(function(item) {
+          item.classList.remove('active');
+        });
+        btn.classList.add('active');
+        Object.keys(sections).forEach(function(key) {
+          sections[key].classList.remove('active');
+        });
+        var target = sections[tab];
+        if (target) target.classList.add('active');
+        if (tab === 'overview') fetchOverviewStats();
+        if (tab === 'knowledge') fetchKnowledge();
+        if (tab === 'scraper' || tab === 'embedding') updateLastRunTimes();
+        if (tab === 'users') fetchUsers();
+        if (tab === 'logs') fetchLogs();
+        if (tab === 'health') fetchHealth();
+      });
+    }
+
+    /* --- Theme --- */
+    var currentTheme = localStorage.getItem('theme') || 'system';
+    var darkMedia = window.matchMedia('(prefers-color-scheme: dark)');
+
+    function applyTheme(mode) {
+      if (mode === 'system') {
+        document.documentElement.classList.toggle('theme-dark', darkMedia.matches);
+      } else {
+        document.documentElement.classList.toggle('theme-dark', mode === 'dark');
+      }
+      updateToggleButton(mode);
+    }
+
+    function setTheme(mode) {
+      currentTheme = mode;
+      localStorage.setItem('theme', mode);
+      applyTheme(mode);
+    }
+
+    function toggleTheme() {
+      var order = ['system', 'light', 'dark'];
+      var idx = order.indexOf(currentTheme);
+      setTheme(order[(idx + 1) % 3]);
+    }
+
+    function updateToggleButton(mode) {
+      var btn = document.getElementById('themeToggle');
+      if (!btn) return;
+      btn.textContent =
+        mode === 'system' ? '🌓' : mode === 'light' ? '☀️' : '🌙';
+      btn.title = mode.charAt(0).toUpperCase() + mode.slice(1) + ' theme';
+    }
+
+    function bindTheme() {
+      darkMedia.addEventListener('change', function() {
+        if (currentTheme === 'system') applyTheme('system');
+      });
+      applyTheme(currentTheme);
+      var themeToggle = document.getElementById('themeToggle');
+      if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
+    }
+
+    /* --- Add Knowledge Modal --- */
+    window.showAddKnowledgeModal = function() {
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeModal(overlay);
+      });
+
+      var box = document.createElement('div');
+      box.className = 'modal-box';
+      box.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">' +
+          '<h2 style="margin:0;">Add Knowledge</h2>' +
+          '<button class="modal-close" style="margin-top:-4px;">&times;</button>' +
+        '</div>' +
+        '<div class="modal-body">' +
+          '<label style="display:block;font-size:14px;color:var(--text-secondary);margin-bottom:6px;">Article URL</label>' +
+          '<input type="url" id="addKnowledgeUrl" class="modal-input" placeholder="https://example.com/article" autofocus>' +
+          '<div id="addKnowledgeProgress" style="display:none;align-items:center;gap:8px;font-size:14px;color:var(--text-secondary);margin-top:12px;">' +
+            '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Processing...' +
+          '</div>' +
+        '</div>' +
+        '<div class="modal-actions" style="margin-top:16px;">' +
+          '<button id="addKnowledgeCancel" class="sidebar-item" style="width:auto;padding:6px 16px;justify-content:center;">Cancel</button>' +
+          '<button id="addKnowledgeSubmit" class="op-btn op-btn-primary" style="width:auto;padding:6px 16px;justify-content:center;">Scrape &amp; Embed</button>' +
+        '</div>';
+
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      var urlInput = box.querySelector('#addKnowledgeUrl');
+      var cancelBtn = box.querySelector('#addKnowledgeCancel');
+      var submitBtn = box.querySelector('#addKnowledgeSubmit');
+      var progressEl = box.querySelector('#addKnowledgeProgress');
+
+      box.querySelector('.modal-close').addEventListener('click', function() { closeModal(overlay); });
+      cancelBtn.addEventListener('click', function() { closeModal(overlay); });
+
+      function setLoading(loading) {
+        cancelBtn.disabled = loading;
+        submitBtn.disabled = loading;
+        urlInput.disabled = loading;
+        progressEl.style.display = loading ? 'flex' : 'none';
+      }
+
+      submitBtn.addEventListener('click', function() {
+        var url = urlInput.value.trim();
+        if (!url) { showToast('Please enter a URL', 'error'); return; }
+        setLoading(true);
+
+        fetch('/api/admin/knowledge/add-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: url })
+        })
+          .then(function(r) {
+            return r.json().then(function(data) {
+              if (!r.ok) {
+                throw new Error(getErrorMessage(data) || 'HTTP ' + r.status);
+              }
+              return data;
+            });
+          })
+          .then(function(data) {
+            if (data.success) {
+              showToast(data.message, 'success');
+              closeModal(overlay);
+              knowledgeData = [];
+              fetchKnowledge();
+              fetchOverviewStats();
+            } else {
+              showToast(data.message, 'error');
+              setLoading(false);
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message || 'Failed to add knowledge', 'error');
+            setLoading(false);
+          });
+      });
+
+      urlInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') submitBtn.click();
+      });
+
+      setTimeout(function() { urlInput.focus(); }, 100);
+    };
+
+    /* --- Knowledge Management --- */
+    var knowledgeData = [];
+    var knowledgeSearchEl = document.getElementById('knowledgeSearch');
+    var knowledgeTableContainer = document.getElementById('knowledgeTableContainer');
+
+    function filteredKnowledge() {
+      var term = knowledgeSearchEl ? knowledgeSearchEl.value.trim().toLowerCase() : '';
+      if (!term) return knowledgeData;
+      return knowledgeData.filter(function(item) {
+        return (item.title && item.title.toLowerCase().includes(term)) ||
+               (item.url && item.url.toLowerCase().includes(term));
+      });
+    }
+
+    function renderKnowledgeTable(data) {
+      var table = document.getElementById('knowledgeTable');
+      var empty = document.getElementById('knowledgeEmpty');
+      var tbody = document.getElementById('knowledgeTableBody');
+      if (!data || data.length === 0) {
+        table.style.display = 'none';
+        empty.style.display = 'block';
+        return;
+      }
+      table.style.display = '';
+      empty.style.display = 'none';
+      tbody.innerHTML = '';
+      data.forEach(function(item) {
+        var badge = item.is_embedded === 1
+          ? createBadge('Embedded', 'success')
+          : createBadge('Pending', 'warning');
+        var tr = document.createElement('tr');
+        tr.dataset.id = item.id;
+        tr.innerHTML =
+          '<td>' + item.id + '</td>' +
+          '<td><span class="truncate" title="' + escapeHtml(item.title) + '">' + escapeHtml(item.title) + '</span></td>' +
+          '<td><span class="truncate" title="' + escapeHtml(item.url) + '">' + escapeHtml(item.url) + '</span></td>' +
+          '<td>' + badge + '</td>' +
+          '<td>' + escapeHtml(item.created_at) + '</td>' +
+          '<td class="actions-cell">' +
+            '<button class="view-btn">View</button> ' +
+            '<button class="delete-btn">Delete</button>' +
+          '</td>';
+        tbody.appendChild(tr);
+      });
+    }
+
+    function fetchKnowledge() {
+      if (knowledgeData.length > 0) {
+        renderKnowledgeTable(filteredKnowledge());
+        return;
+      }
+      var spinner = showSpinner(knowledgeTableContainer);
+      fetch('/api/admin/knowledge')
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          knowledgeData = data;
+          renderKnowledgeTable(filteredKnowledge());
+        })
+        .catch(function(err) {
+          showToast('Failed to load knowledge entries', 'error');
+        })
+        .finally(function() {
+          hideSpinner(spinner);
+        });
+    }
+
+    function bindKnowledge() {
+      if (knowledgeSearchEl) {
+        knowledgeSearchEl.addEventListener('input', function() {
+          renderKnowledgeTable(filteredKnowledge());
+        });
+      }
+      document.getElementById('addKnowledgeBtn').addEventListener('click', showAddKnowledgeModal);
+
+      knowledgeTableContainer.addEventListener('click', function(e) {
+        var btn = e.target.closest('button');
+        if (!btn) return;
+        var tr = btn.closest('tr');
+        var id = tr ? parseInt(tr.dataset.id) : null;
+        if (!id) return;
+
+        if (btn.classList.contains('view-btn')) {
+          var loadingOverlay = openModal({
+            title: 'Loading...',
+            body: '<p>Loading knowledge details...</p>',
+            cancelText: null,
+            confirmText: null
+          });
+          fetch('/api/admin/knowledge/' + id)
+            .then(function(r) {
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+              return r.json();
+            })
+            .then(function(item) {
+              closeModal(loadingOverlay);
+              openModal({
+                title: escapeHtml(item.title),
+                body:
+                  '<p class="modal-url-line"><a class="modal-url" href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(item.url) + '</a></p>' +
+                  '<div style="max-height:300px;overflow-y:auto;background:var(--bg-body);padding:12px;border-radius:4px;font-size:13px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;color:var(--text-primary);margin-top:8px;">' + escapeHtml(item.content) + '</div>',
+                confirmText: null,
+                cancelText: 'Close'
+              });
+            })
+            .catch(function(err) {
+              closeModal(loadingOverlay);
+              showToast('Failed to load knowledge details', 'error');
+            });
+        }
+
+        if (btn.classList.contains('delete-btn')) {
+          openModal({
+            title: 'Confirm Delete',
+            body: '<p>Are you sure you want to delete this knowledge entry? This action cannot be undone.</p>',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            onConfirm: function() {
+              var delSpinner = showSpinner(document.body);
+              fetch('/api/admin/knowledge/' + id, { method: 'DELETE' })
+                .then(function(r) {
+                  if (!r.ok) throw new Error('HTTP ' + r.status);
+                  return r.json();
+                })
+                .then(function() {
+                  showToast('Knowledge entry deleted', 'success');
+                  knowledgeData = [];
+                  fetchKnowledge();
+                })
+                .catch(function(err) {
+                  showToast('Failed to delete knowledge entry', 'error');
+                })
+                .finally(function() {
+                  hideSpinner(delSpinner);
+                });
+            }
+          });
+        }
+      });
+    }
+
+    /* --- Scraper Controls --- */
+    var scraperBtn, scraperStatus, scraperFeedback;
+
+    function showScraperFeedback(message, type) {
+      scraperFeedback.style.display = 'block';
+      scraperFeedback.className = 'card op-feedback-' + type;
+      scraperFeedback.textContent = message;
+    }
+
+    function runScraper() {
+      scraperBtn.disabled = true;
+      scraperStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Running...';
+      scraperFeedback.style.display = 'none';
+      fetch('/api/admin/scrape', { method: 'POST' })
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          if (data.status === 'busy') {
+            showScraperFeedback(data.message, 'error');
+            showToast(data.message, 'error');
+          } else {
+            showScraperFeedback(data.message, 'success');
+            showToast('Scraper started', 'success');
+          }
+          updateLastRunTimes();
+          fetchLogs();
+        })
+        .catch(function(err) {
+          showScraperFeedback('Failed to start scraper', 'error');
+          showToast('Failed to start scraper', 'error');
+        })
+        .finally(function() {
+          scraperBtn.disabled = false;
+          scraperStatus.textContent = '';
+        });
+    }
+
+    function bindScraper() {
+      scraperBtn = document.getElementById('runScraperBtn');
+      scraperStatus = document.getElementById('scraperStatus');
+      scraperFeedback = document.getElementById('scraperFeedback');
+      if (scraperBtn) scraperBtn.addEventListener('click', runScraper);
+    }
+
+    /* --- Embedding Controls --- */
+    var embeddingBtn, rebuildBtn, embeddingStatus, embeddingFeedback;
+
+    function showEmbeddingFeedback(message, type) {
+      embeddingFeedback.style.display = 'block';
+      embeddingFeedback.className = 'card op-feedback-' + type;
+      embeddingFeedback.textContent = message;
+    }
+
+    function setEmbeddingButtons(disabled) {
+      embeddingBtn.disabled = disabled;
+      rebuildBtn.disabled = disabled;
+    }
+
+    function runEmbedding() {
+      setEmbeddingButtons(true);
+      embeddingStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Running...';
+      embeddingFeedback.style.display = 'none';
+      fetch('/api/admin/embedding', { method: 'POST' })
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          if (data.status === 'busy') {
+            showEmbeddingFeedback(data.message, 'error');
+            showToast(data.message, 'error');
+          } else {
+            showEmbeddingFeedback(data.message, 'success');
+            showToast('Embedding started', 'success');
+          }
+          updateLastRunTimes();
+          fetchLogs();
+        })
+        .catch(function(err) {
+          showEmbeddingFeedback('Failed to start embedding', 'error');
+          showToast('Failed to start embedding', 'error');
+        })
+        .finally(function() {
+          setEmbeddingButtons(false);
+          embeddingStatus.textContent = '';
+        });
+    }
+
+    function rebuildEverything() {
+      openModal({
+        title: 'Confirm Rebuild',
+        body: '<p>This will reset all embeddings and rebuild from scratch. This operation cannot be undone. Continue?</p>',
+        confirmText: 'Rebuild',
+        cancelText: 'Cancel',
+        onConfirm: function() {
+          setEmbeddingButtons(true);
+          embeddingStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Rebuilding...';
+          embeddingFeedback.style.display = 'none';
+          fetch('/api/admin/rebuild', { method: 'POST' })
+            .then(function(r) {
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+              return r.json();
+            })
+            .then(function(data) {
+              if (data.status === 'busy') {
+                showEmbeddingFeedback(data.message, 'error');
+                showToast(data.message, 'error');
+              } else {
+                showEmbeddingFeedback(data.message, 'success');
+                showToast('Rebuild started', 'success');
+              }
+              updateLastRunTimes();
+              fetchLogs();
+            })
+            .catch(function(err) {
+              showEmbeddingFeedback('Failed to start rebuild', 'error');
+              showToast('Failed to start rebuild', 'error');
+            })
+            .finally(function() {
+              setEmbeddingButtons(false);
+              embeddingStatus.textContent = '';
+            });
+        }
+      });
+    }
+
+    function bindEmbedding() {
+      embeddingBtn = document.getElementById('runEmbeddingBtn');
+      rebuildBtn = document.getElementById('rebuildBtn');
+      embeddingStatus = document.getElementById('embeddingStatus');
+      embeddingFeedback = document.getElementById('embeddingFeedback');
+      if (embeddingBtn) embeddingBtn.addEventListener('click', runEmbedding);
+      if (rebuildBtn) rebuildBtn.addEventListener('click', rebuildEverything);
+    }
+
+    /* --- Chat Test --- */
+    var askBtn, chatQuery, chatStatus, chatResponseCard, chatReply, chatSources, chatSourcesCard;
+
+    function askQuestion() {
+      var query = chatQuery.value.trim();
+      if (!query) { showToast('Please enter a question', 'error'); return; }
+
+      askBtn.disabled = true;
+      chatStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Thinking...';
+      chatResponseCard.style.display = 'none';
+      chatSourcesCard.style.display = 'none';
+
+      fetch('/api/admin/chat-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: query })
+      })
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          chatReply.textContent = data.reply;
+          chatResponseCard.style.display = 'block';
+
+          var sourcesHtml = '';
+          if (data.sources && data.sources.length > 0) {
+            sourcesHtml = '<ul>';
+            data.sources.forEach(function(s) {
+              sourcesHtml += '<li><a href="' + s.url + '" target="_blank">' + s.title + '</a></li>';
+            });
+            sourcesHtml += '</ul>';
+          } else {
+            sourcesHtml = '<div class="empty-state" style="padding:12px 0;">No sources found</div>';
+          }
+          chatSources.innerHTML = sourcesHtml;
+          chatSourcesCard.style.display = 'block';
+        })
+        .catch(function(err) {
+          showToast('Failed to get response', 'error');
+          chatReply.textContent = 'Error: ' + err.message;
+          chatResponseCard.style.display = 'block';
+          chatSourcesCard.style.display = 'none';
+        })
+        .finally(function() {
+          askBtn.disabled = false;
+          chatStatus.textContent = '';
+        });
+    }
+
+    function bindChat() {
+      askBtn = document.getElementById('askBtn');
+      chatQuery = document.getElementById('chatQuery');
+      chatStatus = document.getElementById('chatStatus');
+      chatResponseCard = document.getElementById('chatResponseCard');
+      chatReply = document.getElementById('chatReply');
+      chatSources = document.getElementById('chatSources');
+      chatSourcesCard = document.getElementById('chatSourcesCard');
+      if (askBtn) askBtn.addEventListener('click', askQuestion);
+      if (chatQuery) chatQuery.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) askQuestion();
+      });
+    }
+
+    /* --- Health --- */
+    var refreshHealthBtn;
+
+    function fetchHealth() {
+      var container = document.getElementById('healthCards');
+      container.innerHTML = '<div class="placeholder-text">Loading...</div>';
+
+      fetch('/api/admin/health')
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          var components = [
+            { name: 'API', status: data.api },
+            { name: 'Database', status: data.database },
+            { name: 'Qdrant', status: data.qdrant },
+            { name: 'Groq', status: data.groq }
+          ];
+          var html = '';
+          components.forEach(function(c) {
+            var badge = c.status
+              ? '<span class="badge badge-success">Online</span>'
+              : '<span class="badge badge-error">Offline</span>';
+            html += '<div class="kpi-card">' +
+              '<div class="kpi-label">' + c.name + '</div>' +
+              '<div style="margin-top:8px;">' + badge + '</div>' +
+            '</div>';
+          });
+          container.innerHTML = html;
+        })
+        .catch(function(err) {
+          container.innerHTML = '<div class="placeholder-text">Failed to load health status</div>';
+          showToast('Failed to load health status', 'error');
+        });
+    }
+
+    function bindHealth() {
+      refreshHealthBtn = document.getElementById('refreshHealthBtn');
+      if (refreshHealthBtn) refreshHealthBtn.addEventListener('click', fetchHealth);
+    }
+
+    /* --- Overview --- */
+    function fetchOverviewStats() {
+      fetch('/api/admin/stats')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+          if (!data) return;
+          document.getElementById('overviewTotalContent').textContent = data.total_articles;
+          document.getElementById('overviewEmbedded').textContent = data.embedded_articles;
+          document.getElementById('overviewPending').textContent = data.pending_articles;
+          document.getElementById('overviewQuestions').textContent = data.questions_count;
+          document.getElementById('overviewLastScraping').textContent = data.last_scraping || 'Never';
+          document.getElementById('overviewLastEmbedding').textContent = data.last_embedding || 'Never';
+        })
+        .catch(function(err) {
+          showToast('Failed to load overview stats', 'error');
+        });
+
+      fetch('/api/admin/health')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+          if (!data) return;
+          document.getElementById('overviewDatabase').textContent = data.database ? 'Online' : 'Offline';
+          document.getElementById('overviewQdrant').textContent = data.qdrant ? 'Online' : 'Offline';
+        })
+        .catch(function() {});
+    }
+
+    /* --- Logs --- */
+    var refreshLogsBtn, logsTableBody, logsTable, logsEmpty, logsStatus;
+
+    function fetchLogs() {
+      logsTable.style.display = 'none';
+      logsEmpty.style.display = 'none';
+      logsStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Loading...';
+
+      fetch('/api/admin/logs?limit=50')
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          if (!data || data.length === 0) {
+            logsTable.style.display = 'none';
+            logsEmpty.style.display = 'block';
+            return;
+          }
+          logsTable.style.display = '';
+          logsEmpty.style.display = 'none';
+          logsTableBody.innerHTML = '';
+          data.forEach(function(row) {
+            var ts = row.timestamp ? new Date(row.timestamp).toLocaleString() : '';
+            var tr = document.createElement('tr');
+            tr.innerHTML = '<td>' + escapeHtml(ts) + '</td><td>' + escapeHtml(row.event) + '</td>';
+            logsTableBody.appendChild(tr);
+          });
+        })
+        .catch(function(err) {
+          logsTable.style.display = 'none';
+          logsEmpty.style.display = 'block';
+          logsEmpty.textContent = 'Failed to load logs';
+          showToast('Failed to load logs', 'error');
+        })
+        .finally(function() {
+          logsStatus.textContent = '';
+        });
+    }
+
+    function bindLogs() {
+      refreshLogsBtn = document.getElementById('refreshLogsBtn');
+      logsTableBody = document.getElementById('logsTableBody');
+      logsTable = document.getElementById('logsTable');
+      logsEmpty = document.getElementById('logsEmpty');
+      logsStatus = document.getElementById('logsStatus');
+      if (refreshLogsBtn) refreshLogsBtn.addEventListener('click', fetchLogs);
+    }
+
+    /* --- Users --- */
+    var usersTableBody, usersTable, usersEmpty, usersStatus, addUserBtn;
+
+    function fetchUsers() {
+      usersTable.style.display = 'none';
+      usersEmpty.style.display = 'none';
+      usersStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Loading...';
+
+      fetch('/api/admin/users')
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          if (!data || data.length === 0) {
+            usersTable.style.display = 'none';
+            usersEmpty.style.display = 'block';
+            return;
+          }
+          usersTable.style.display = '';
+          usersEmpty.style.display = 'none';
+          usersTableBody.innerHTML = '';
+          data.forEach(function(u) {
+            var roleBadge = u.role === 'owner'
+              ? '<span class="user-role-badge owner">owner</span>'
+              : '<span class="user-role-badge admin">admin</span>';
+            var statusBadge = u.is_active
+              ? createBadge('Active', 'success')
+              : createBadge('Inactive', 'error');
+            var lastLogin = u.last_login_at ? new Date(u.last_login_at).toLocaleString() : 'Never';
+            var createdAt = u.created_at ? new Date(u.created_at).toLocaleString() : '';
+            var isSelf = currentUser && currentUser.id === u.id;
+
+            var actionsHtml = '<td class="actions-cell">';
+            if (!isSelf) {
+              actionsHtml += '<button class="edit-user-btn" data-id="' + u.id + '">Edit</button> ';
+              actionsHtml += '<button class="reset-pw-user-btn" data-id="' + u.id + '">Reset PW</button> ';
+              if (u.is_active) {
+                actionsHtml += '<button class="disable-user-btn" data-id="' + u.id + '" data-action="disable">Disable</button> ';
+              } else {
+                actionsHtml += '<button class="disable-user-btn" data-id="' + u.id + '" data-action="enable">Enable</button> ';
+              }
+              actionsHtml += '<button class="delete-user-btn delete-btn" data-id="' + u.id + '">Delete</button>';
+            } else {
+              actionsHtml += '<span style="color:var(--text-secondary);font-size:12px;">You</span>';
+            }
+            actionsHtml += '</td>';
+
+            var tr = document.createElement('tr');
+            tr.dataset.id = u.id;
+            tr.innerHTML =
+              '<td>' + escapeHtml(u.display_name) + '</td>' +
+              '<td>' + escapeHtml(u.username) + '</td>' +
+              '<td>' + roleBadge + '</td>' +
+              '<td>' + statusBadge + '</td>' +
+              '<td>' + escapeHtml(lastLogin) + '</td>' +
+              '<td>' + escapeHtml(createdAt) + '</td>' +
+              actionsHtml;
+            usersTableBody.appendChild(tr);
+          });
+        })
+        .catch(function(err) {
+          usersTable.style.display = 'none';
+          usersEmpty.style.display = 'block';
+          usersEmpty.textContent = 'Failed to load users';
+          showToast('Failed to load users', 'error');
+        })
+        .finally(function() {
+          usersStatus.textContent = '';
+        });
+    }
+
+    function showAddUserModal() {
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeModal(overlay);
+      });
+
+      var isOwner = currentUser && currentUser.role === 'owner';
+      var roleOptions = isOwner
+        ? '<option value="admin">Admin</option><option value="owner">Owner</option>'
+        : '<option value="admin">Admin</option>';
+
+      var box = document.createElement('div');
+      box.className = 'modal-box';
+      box.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">' +
+          '<h2 style="margin:0;">Add User</h2>' +
+          '<button class="modal-close" style="margin-top:-4px;">&times;</button>' +
+        '</div>' +
+        '<div class="modal-body">' +
+          '<div class="form-group"><label>Display Name</label><input type="text" id="addUserDisplayName" class="modal-input" placeholder="Full name"></div>' +
+          '<div class="form-group"><label>Username</label><input type="text" id="addUserUsername" class="modal-input" placeholder="username (lowercase, a-z, 0-9, _)"></div>' +
+          '<div class="form-group"><label>Password</label><input type="password" id="addUserPassword" class="modal-input" placeholder="Min 8 characters"></div>' +
+          '<div class="form-group"><label>Role</label><select id="addUserRole" class="modal-select">' + roleOptions + '</select></div>' +
+          '<div id="addUserProgress" style="display:none;align-items:center;gap:8px;font-size:14px;color:var(--text-secondary);margin-top:8px;">' +
+            '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Creating...' +
+          '</div>' +
+        '</div>' +
+        '<div class="modal-actions" style="margin-top:8px;">' +
+          '<button id="addUserCancel" class="sidebar-item" style="width:auto;padding:6px 16px;justify-content:center;">Cancel</button>' +
+          '<button id="addUserSubmit" class="op-btn op-btn-primary" style="width:auto;padding:6px 16px;justify-content:center;">Create User</button>' +
+        '</div>';
+
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      var displayNameInput = box.querySelector('#addUserDisplayName');
+      var usernameInput = box.querySelector('#addUserUsername');
+      var passwordInput = box.querySelector('#addUserPassword');
+      var roleSelect = box.querySelector('#addUserRole');
+      var cancelBtn = box.querySelector('#addUserCancel');
+      var submitBtn = box.querySelector('#addUserSubmit');
+      var progressEl = box.querySelector('#addUserProgress');
+
+      box.querySelector('.modal-close').addEventListener('click', function() { closeModal(overlay); });
+      cancelBtn.addEventListener('click', function() { closeModal(overlay); });
+
+      function setLoading(loading) {
+        cancelBtn.disabled = loading;
+        submitBtn.disabled = loading;
+        displayNameInput.disabled = loading;
+        usernameInput.disabled = loading;
+        passwordInput.disabled = loading;
+        roleSelect.disabled = loading;
+        progressEl.style.display = loading ? 'flex' : 'none';
+      }
+
+      submitBtn.addEventListener('click', function() {
+        var payload = {
+          display_name: displayNameInput.value.trim(),
+          username: usernameInput.value.trim(),
+          password: passwordInput.value,
+          role: roleSelect.value
+        };
+        if (!payload.display_name) { showToast('Display name is required', 'error'); return; }
+        if (!payload.username) { showToast('Username is required', 'error'); return; }
+        if (!payload.password) { showToast('Password is required', 'error'); return; }
+
+        setLoading(true);
+
+        fetch('/api/admin/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(function(r) {
+            return r.json().then(function(data) {
+              if (!r.ok) throw new Error(getErrorMessage(data) || 'HTTP ' + r.status);
+              return data;
+            });
+          })
+          .then(function(data) {
+            if (data.success) {
+              showToast(data.message, 'success');
+              closeModal(overlay);
+              fetchUsers();
+            } else {
+              showToast(data.message, 'error');
+              setLoading(false);
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message, 'error');
+            setLoading(false);
+          });
+      });
+
+      setTimeout(function() { displayNameInput.focus(); }, 100);
+    }
+
+    function showEditUserModal(userId, currentData) {
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeModal(overlay);
+      });
+
+      var isOwner = currentUser && currentUser.role === 'owner';
+      var roleOptions = isOwner
+        ? '<option value="admin"' + (currentData.role === 'admin' ? ' selected' : '') + '>Admin</option><option value="owner"' + (currentData.role === 'owner' ? ' selected' : '') + '>Owner</option>'
+        : '<option value="admin"' + (currentData.role === 'admin' ? ' selected' : '') + '>Admin</option>';
+
+      var box = document.createElement('div');
+      box.className = 'modal-box';
+      box.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">' +
+          '<h2 style="margin:0;">Edit User</h2>' +
+          '<button class="modal-close" style="margin-top:-4px;">&times;</button>' +
+        '</div>' +
+        '<div class="modal-body">' +
+          '<div class="form-group"><label>Display Name</label><input type="text" id="editUserDisplayName" class="modal-input" value="' + escapeHtml(currentData.display_name) + '"></div>' +
+          '<div class="form-group"><label>Role</label><select id="editUserRole" class="modal-select">' + roleOptions + '</select></div>' +
+          '<div class="form-group"><label>Status</label><select id="editUserStatus" class="modal-select">' +
+            '<option value="1"' + (currentData.is_active ? ' selected' : '') + '>Active</option>' +
+            '<option value="0"' + (!currentData.is_active ? ' selected' : '') + '>Inactive</option>' +
+          '</select></div>' +
+          '<div id="editUserProgress" style="display:none;align-items:center;gap:8px;font-size:14px;color:var(--text-secondary);margin-top:8px;">' +
+            '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Saving...' +
+          '</div>' +
+        '</div>' +
+        '<div class="modal-actions" style="margin-top:8px;">' +
+          '<button id="editUserCancel" class="sidebar-item" style="width:auto;padding:6px 16px;justify-content:center;">Cancel</button>' +
+          '<button id="editUserSubmit" class="op-btn op-btn-primary" style="width:auto;padding:6px 16px;justify-content:center;">Save</button>' +
+        '</div>';
+
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      var nameInput = box.querySelector('#editUserDisplayName');
+      var roleSelect = box.querySelector('#editUserRole');
+      var statusSelect = box.querySelector('#editUserStatus');
+      var cancelBtn = box.querySelector('#editUserCancel');
+      var submitBtn = box.querySelector('#editUserSubmit');
+      var progressEl = box.querySelector('#editUserProgress');
+
+      box.querySelector('.modal-close').addEventListener('click', function() { closeModal(overlay); });
+      cancelBtn.addEventListener('click', function() { closeModal(overlay); });
+
+      function setLoading(loading) {
+        cancelBtn.disabled = loading;
+        submitBtn.disabled = loading;
+        nameInput.disabled = loading;
+        roleSelect.disabled = loading;
+        statusSelect.disabled = loading;
+        progressEl.style.display = loading ? 'flex' : 'none';
+      }
+
+      submitBtn.addEventListener('click', function() {
+        var payload = {};
+        var name = nameInput.value.trim();
+        if (name && name !== currentData.display_name) payload.display_name = name;
+        var role = roleSelect.value;
+        if (role !== currentData.role) payload.role = role;
+        var isActive = statusSelect.value === '1';
+        if (isActive !== currentData.is_active) payload.is_active = isActive;
+
+        if (Object.keys(payload).length === 0) {
+          showToast('No changes to save', 'error');
+          return;
+        }
+
+        setLoading(true);
+
+        fetch('/api/admin/users/' + userId, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(function(r) {
+            return r.json().then(function(data) {
+              if (!r.ok) throw new Error(getErrorMessage(data) || 'HTTP ' + r.status);
+              return data;
+            });
+          })
+          .then(function(data) {
+            if (data.success) {
+              showToast(data.message, 'success');
+              closeModal(overlay);
+              fetchUsers();
+            } else {
+              showToast(data.message, 'error');
+              setLoading(false);
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message, 'error');
+            setLoading(false);
+          });
+      });
+    }
+
+    function showResetPasswordModal(userId) {
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeModal(overlay);
+      });
+
+      var box = document.createElement('div');
+      box.className = 'modal-box';
+      box.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">' +
+          '<h2 style="margin:0;">Reset Password</h2>' +
+          '<button class="modal-close" style="margin-top:-4px;">&times;</button>' +
+        '</div>' +
+        '<div class="modal-body">' +
+          '<p>Enter the new password for this user.</p>' +
+          '<div class="form-group"><label>New Password</label><input type="password" id="resetPwInput" class="modal-input" placeholder="Min 8 characters"></div>' +
+          '<div id="resetPwProgress" style="display:none;align-items:center;gap:8px;font-size:14px;color:var(--text-secondary);margin-top:8px;">' +
+            '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Resetting...' +
+          '</div>' +
+        '</div>' +
+        '<div class="modal-actions" style="margin-top:8px;">' +
+          '<button id="resetPwCancel" class="sidebar-item" style="width:auto;padding:6px 16px;justify-content:center;">Cancel</button>' +
+          '<button id="resetPwSubmit" class="op-btn op-btn-primary" style="width:auto;padding:6px 16px;justify-content:center;">Reset Password</button>' +
+        '</div>';
+
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      var passwordInput = box.querySelector('#resetPwInput');
+      var cancelBtn = box.querySelector('#resetPwCancel');
+      var submitBtn = box.querySelector('#resetPwSubmit');
+      var progressEl = box.querySelector('#resetPwProgress');
+
+      box.querySelector('.modal-close').addEventListener('click', function() { closeModal(overlay); });
+      cancelBtn.addEventListener('click', function() { closeModal(overlay); });
+
+      function setLoading(loading) {
+        cancelBtn.disabled = loading;
+        submitBtn.disabled = loading;
+        passwordInput.disabled = loading;
+        progressEl.style.display = loading ? 'flex' : 'none';
+      }
+
+      submitBtn.addEventListener('click', function() {
+        var password = passwordInput.value;
+        if (!password) { showToast('Password is required', 'error'); return; }
+
+        setLoading(true);
+
+        fetch('/api/admin/users/' + userId + '/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: password })
+        })
+          .then(function(r) {
+            return r.json().then(function(data) {
+              if (!r.ok) throw new Error(getErrorMessage(data) || 'HTTP ' + r.status);
+              return data;
+            });
+          })
+          .then(function(data) {
+            if (data.success) {
+              showToast(data.message, 'success');
+              closeModal(overlay);
+            } else {
+              showToast(data.message, 'error');
+              setLoading(false);
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message, 'error');
+            setLoading(false);
+          });
+      });
+
+      setTimeout(function() { passwordInput.focus(); }, 100);
+    }
+
+    function bindUsers() {
+      usersTableBody = document.getElementById('usersTableBody');
+      usersTable = document.getElementById('usersTable');
+      usersEmpty = document.getElementById('usersEmpty');
+      usersStatus = document.getElementById('usersStatus');
+      addUserBtn = document.getElementById('addUserBtn');
+
+      if (addUserBtn) addUserBtn.addEventListener('click', showAddUserModal);
+
+      document.getElementById('usersTableContainer').addEventListener('click', function(e) {
+        var btn = e.target.closest('button');
+        if (!btn) return;
+        var userId = parseInt(btn.dataset.id);
+        if (!userId) return;
+
+        if (btn.classList.contains('edit-user-btn')) {
+          var tr = btn.closest('tr');
+          var cells = tr.querySelectorAll('td');
+          var userData = {
+            display_name: cells[0].textContent,
+            username: cells[1].textContent,
+            role: cells[2].textContent.trim().toLowerCase(),
+            is_active: cells[3].querySelector('.badge-success') ? true : false
+          };
+          showEditUserModal(userId, userData);
+        }
+
+        if (btn.classList.contains('reset-pw-user-btn')) {
+          showResetPasswordModal(userId);
+        }
+
+        if (btn.classList.contains('disable-user-btn')) {
+          var action = btn.dataset.action;
+          var newActive = action === 'enable' ? true : false;
+          var label = newActive ? 'enable' : 'disable';
+          openModal({
+            title: 'Confirm',
+            body: '<p>Are you sure you want to ' + label + ' this user?</p>',
+            confirmText: label.charAt(0).toUpperCase() + label.slice(1),
+            cancelText: 'Cancel',
+            onConfirm: function() {
+              fetch('/api/admin/users/' + userId, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: newActive })
+              })
+                .then(function(r) {
+                  return r.json().then(function(data) {
+                    if (!r.ok) throw new Error(getErrorMessage(data) || 'HTTP ' + r.status);
+                    return data;
+                  });
+                })
+                .then(function(data) {
+                  if (data.success) {
+                    showToast(data.message, 'success');
+                    fetchUsers();
+                  } else {
+                    showToast(data.message, 'error');
+                  }
+                })
+                .catch(function(err) {
+                  showToast(err.message, 'error');
+                });
+            }
+          });
+        }
+
+        if (btn.classList.contains('delete-user-btn')) {
+          openModal({
+            title: 'Confirm Delete',
+            body: '<p>Are you sure you want to delete this user? This action cannot be undone.</p>',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            onConfirm: function() {
+              var delSpinner = showSpinner(document.body);
+              fetch('/api/admin/users/' + userId, { method: 'DELETE' })
+                .then(function(r) {
+                  return r.json().then(function(data) {
+                    if (!r.ok) throw new Error(getErrorMessage(data) || 'HTTP ' + r.status);
+                    return data;
+                  });
+                })
+                .then(function(data) {
+                  if (data.success) {
+                    showToast(data.message, 'success');
+                    fetchUsers();
+                  } else {
+                    showToast(data.message, 'error');
+                  }
+                })
+                .catch(function(err) {
+                  showToast(err.message, 'error');
+                })
+                .finally(function() {
+                  hideSpinner(delSpinner);
+                });
+            }
+          });
+        }
+      });
+    }
+
+    /* --- Shared --- */
+    function updateLastRunTimes() {
+      fetch('/api/admin/stats')
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+          if (!data) return;
+          var lastScrape = document.getElementById('scraperLastRun');
+          var lastEmbed = document.getElementById('embeddingLastRun');
+          if (lastScrape) lastScrape.textContent = data.last_scraping || 'Never';
+          if (lastEmbed) lastEmbed.textContent = data.last_embedding || 'Never';
+        })
+        .catch(function() {});
+    }
+  })();
+</script>
+</body>
+</html>

@@ -19,59 +19,82 @@ End-to-end Retrieval-Augmented Generation (RAG) pipeline that scrapes Arabic den
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           DATA INGESTION (main.py)                          │
-│                                                                             │
-│  blog.asnany.net                                                           │
-│       │                                                                     │
-│       ▼                                                                     │
-│  ┌─────────────┐    ┌──────────────┐    ┌───────────────┐    ┌───────────┐ │
-│  │  Scraper     │───▶│  MySQL       │───▶│  Embedder     │───▶│  Qdrant   │ │
-│  │  (asnany_   │    │  (database_  │    │  (sentence-   │    │  Uploader │ │
-│  │  scraper.py) │    │  server.py)  │    │  transformers) │    │  (batch)  │ │
-│  └─────────────┘    └──────────────┘    └───────────────┘    └───────────┘ │
-│       │                    │                      │                │        │
-│       ▼                    ▼                      ▼                ▼        │
-│  articles.csv       MySQL (source of truth)   chunk + embed      Qdrant    │
-│  (CSV backup)       blog table                → passage: ...     Cloud     │
-│                     ┌────────────────────┐                   (COSINE)      │
-│                     │ id (PK, AUTO_INC)   │                                │
-│                     │ title VARCHAR(500)  │                                │
-│                     │ url VARCHAR(1000)   │                                │
-│                     │ content LONGTEXT    │                                │
-│                     │ is_embedded TINYINT │                                │
-│                     │ created_at TIMESTAMP│                                │
-│                     │ updated_at TIMESTAMP│                                │
-│                     └────────────────────┘                                │
-│                                                                             │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                           QUERY PIPELINE (run.py)                           │
-│                                                                             │
-│  ┌──────────┐    ┌────────────────┐    ┌──────────────┐    ┌────────────┐  │
-│  │  Chat     │───▶│  Qdrant        │───▶│  MySQL Fetch │───▶│  Groq LLM  │  │
-│  │  Widget   │    │  Retriever     │    │  (sources)   │    │  (answer)  │  │
-│  │  (RTL UI) │    │  (top-K=3)     │    │              │    │            │  │
-│  └──────────┘    └────────────────┘    └──────────────┘    └────────────┘  │
-│       │                    │                      │                │        │
-│       │                    ▼                      │                ▼        │
-│       │           query → embedding               │         Arabic reply   │
-│       │           → COSINE search                 │         + sources      │
-│       └─────────────────────────────────────────────── chat_logs.jsonl ────┘
-└─────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                           DATA INGESTION (main.py)                           │
+│                                                                              │
+│  blog.asnany.net                                                            │
+│       │                                                                      │
+│       ▼                                                                      │
+│  ┌─────────────┐    ┌──────────────┐    ┌───────────────┐    ┌───────────┐  │
+│  │  Scraper     │───▶│  MySQL       │───▶│  Embedder     │───▶│  Qdrant   │  │
+│  │  (asnany_   │    │  (database_  │    │  (sentence-   │    │  Uploader │  │
+│  │  scraper.py) │    │  server.py)  │    │  transformers) │    │  (batch)  │  │
+│  └─────────────┘    └──────────────┘    └───────────────┘    └───────────┘  │
+│       │                    │                      │                │         │
+│       ▼                    ▼                      ▼                ▼         │
+│  articles.csv       MySQL (source of truth)   chunk + embed      Qdrant     │
+│  (CSV backup)       ┌──────────────────────┐  → passage: ...     Cloud      │
+│                     │ blog (articles)       │                 (COSINE)       │
+│                     │ dashboard_logs        │                               │
+│                     │ chat_logs             │                               │
+│                     └──────────────────────┘                               │
+│                                                                              │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                           QUERY PIPELINE (run.py)                            │
+│                                                                              │
+│  ┌──────────┐    ┌────────────────┐    ┌──────────────┐    ┌────────────┐   │
+│  │  Chat     │───▶│  Qdrant        │───▶│  MySQL Fetch │───▶│  Groq LLM  │   │
+│  │  Widget   │    │  Retriever     │    │  (sources)   │    │  (answer)  │   │
+│  │  (RTL UI) │    │  (top-K=3)     │    │              │    │            │   │
+│  └──────────┘    └────────────────┘    └──────────────┘    └────────────┘   │
+│       │                    │                      │                │         │
+│       │                    ▼                      │                ▼         │
+│       │           query → embedding               │         Arabic reply    │
+│       │           → COSINE search                 │         + sources       │
+│       ├──────────────────────────────────────────────────────────────────────┤
+│       │            chat_logs.jsonl + chat_logs (DB table)                   │
+│       └──────────────────────────────────────────────────────────────────────┘
+│                                                                              │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                         ADMIN & DASHBOARD (run.py)                          │
+│                                                                              │
+│  ┌──────────────────┐        ┌──────────────────────────────────────┐       │
+│  │  Dashboard        │───────▶│  Admin API   (/api/admin)            │       │
+│  │  (dashboard/     │        │                                      │       │
+│  │   index.html)    │        │  GET  /stats        POST /scrape     │       │
+│  │                  │        │  GET  /knowledge    POST /embedding   │       │
+│  │  • Overview      │        │  GET  /knowledge/{id} POST /rebuild  │       │
+│  │  • Knowledge     │        │  DELETE /knowledge/{id}              │       │
+│  │  • Scraper       │        │  GET  /logs         POST /chat-test  │       │
+│  │  • Embedding     │        │  GET  /health                        │       │
+│  │  • Chat Test     │        └──────┬───────────────────────────────┘       │
+│  │  • Logs          │               │                                      │
+│  │  • Health        │               ▼                                      │
+│  └──────────────────┘    ┌──────────────────────┐   ┌──────────────────┐   │
+│                          │  MySQL               │   │  Qdrant          │   │
+│                          │  (dashboard_logs,    │   │  (health check)  │   │
+│                          │   blog, chat_logs)   │   │                  │   │
+│                          └──────────────────────┘   └──────────────────┘   │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Components
 
 | Component | Role |
 |-----------|------|
-| **Scraper** | Incrementally crawls the WordPress blog paginated listing, extracts article title/content, normalizes URLs, writes to CSV |
+| **Scraper** | Incrementally crawls the WordPress blog paginated listing, extracts article title/content, normalizes URLs, writes to CSV or inserts directly into MySQL |
 | **MySQL Seed** | Reads CSV into a MySQL database with normalized URL deduplication (`INSERT IGNORE`) |
 | **Embedder** | Chunks article content (800 chars, 200 overlap), prepends `"passage: {title}"` for E5 compatibility, generates 1024-dim vectors via SentenceTransformer |
 | **Qdrant Uploader** | Creates a Qdrant collection with named vector `"embedding_text"` (COSINE distance), batch-upserts with deterministic UUIDv5 point IDs |
 | **Qdrant Retriever** | Encodes query with `"query: {text}"` prefix, searches Qdrant for top-K most similar chunks |
 | **Groq LLM** | Generates Arabic medical answers using `openai/gpt-oss-20b` with a strict system prompt |
 | **Chat Widget** | Arabic RTL frontend with typewriter animation, health checks, and source links |
-| **Utility Scripts** | MySQL import, deduplication, diagnostics, and connectivity test scripts |
+| **Admin API** | FastAPI router (9 endpoints under `/api/admin`) for stats, knowledge CRUD, scraper/embedding control, job status, multi-component health |
+| **Admin Service** | Business logic layer — stats aggregation, Qdrant/Groq health checks, background job management with threading lock |
+| **Dashboard Logger** | Writes operational events (`scraper_started`, `embedding_completed`, `system_error`, etc.) to the `dashboard_logs` MySQL table |
+| **Dashboard Frontend** | Single-file Arabic RTL admin UI with 7 tabs (Overview, Knowledge, Scraper, Embedding, Chat Test, Logs, Health), theme switching, responsive layout |
+| **Migration Scripts** | One-time scripts to create `dashboard_logs` and `chat_logs` MySQL tables |
+| **Utility Scripts** | MySQL import, deduplication, diagnostics, connectivity test, and chat log verification scripts |
 
 ---
 
@@ -108,7 +131,7 @@ asnany_article_rag_production/
 ├── run.py                        # Entry point: start FastAPI server with uvicorn on port 8000
 ├── fastapi_embedding.py          # Standalone server with POST /run-embedding to trigger pipeline
 │
-├── ai/                           # AI / chat logic
+├── ai/                           # AI / chat / admin logic
 │   ├── prompt/
 │   │   └── system_prompt.txt     # Arabic system prompt for the LLM (medical answer generator)
 │   ├── chatbot/
@@ -116,16 +139,31 @@ asnany_article_rag_production/
 │   │   ├── sql_fetch.py          # Fetches article title + URL from MySQL by blog_id
 │   │   └── reply.py              # Builds context, calls Groq API, returns answer + deduped sources
 │   └── endpoint/
+│       ├── admin.py              # FastAPI admin router: /api/admin (stats, CRUD, health, background jobs)
 │       ├── chat.py               # FastAPI router: POST /chat/ validation, orchestration, logging
-│       └── fastapi.py            # FastAPI app factory: CORS, health check, mounts chat router
+│       └── fastapi.py            # FastAPI app factory: CORS, health check, mounts chat + admin routers, /dashboard static
 │
-├── database/                     # Data storage / embedding / upload
+├── dashboard/                    # Admin dashboard (no build step, single HTML file)
+│   ├── index.html                # Dashboard frontend (all inline CSS/JS, 7 tabs, theme support)
+│   └── docs/                     # Specification documents
+│       ├── API.md                # Admin API endpoint specifications
+│       ├── DB_SCHEMA.md          # New database table specifications
+│       ├── TASKS.md              # Implementation tasks & milestones
+│       ├── UI.md                 # User interface specifications
+│       ├── SCOPE.md              # Dashboard scope definition
+│       └── M0_FINDINGS.md        # Milestone 0 audit findings
+│
+├── database/                     # Data storage / embedding / upload / admin
 │   ├── db.py                     # MySQL connection manager (PyMySQL, env-based config)
 │   ├── database_server.py        # MySQL seeding from CSV + per-article embedding pipeline
 │   ├── embedder.py               # Text chunking, SentenceTransformer embedding, Qdrant point prep
 │   ├── qdrant_uploader.py        # Collection creation, batch upsert, UUID normalization
+│   ├── admin_service.py          # Admin business logic: stats, knowledge CRUD, health checks, background jobs
+│   ├── dashboard_logger.py       # Operational event logging to dashboard_logs table
 │   └── tables/
-│       └── blog.py               # MySQL DDL: CREATE TABLE blog (id, title, url UNIQUE, content, is_embedded)
+│       ├── blog.py               # MySQL DDL: CREATE TABLE blog (articles)
+│       ├── dashboard_logs.py     # MySQL DDL: dashboard_logs (operational event log)
+│       └── chat_logs.py          # MySQL DDL: chat_logs (chat analytics)
 │
 ├── scraper/                      # Web scraping
 │   ├── articles.csv              # Scraped data backup (exported from MySQL at runtime — gitignored)
@@ -135,7 +173,10 @@ asnany_article_rag_production/
 │   ├── import_csv_to_mysql.py    # One-time legacy CSV → MySQL import
 │   ├── test_mysql.py             # MySQL connectivity smoke test
 │   ├── check_duplicate_urls.py   # Diagnostic for duplicate normalized URLs in MySQL
-│   └── dedupe_mysql_blog_urls.py # Deduplicate tool (dry-run by default)
+│   ├── dedupe_mysql_blog_urls.py # Deduplicate tool (dry-run by default)
+│   ├── migrate_001_create_dashboard_logs.py  # Create dashboard_logs table
+│   ├── migrate_002_create_chat_logs.py       # Create chat_logs table
+│   └── verify_chat_logs.py       # Verify chat_logs insert/select/delete workflow
 │
 ├── web/
 │   └── index.html                # Chat widget frontend (Arabic RTL, typewriter effect, source links)
@@ -219,6 +260,17 @@ Edit `.env` with your actual credentials. Every variable is documented below:
 
 ## Running the Project
 
+### Database migrations
+
+Run these once to create the required MySQL tables:
+
+```bash
+uv run python scripts/migrate_001_create_dashboard_logs.py
+uv run python scripts/migrate_002_create_chat_logs.py
+```
+
+Note: The `blog` table is auto-created by `main.py` on first run.
+
 ### Full data pipeline (scrape → MySQL → embed → upload)
 
 ```bash
@@ -233,16 +285,33 @@ This runs the following stages sequentially:
 5. Checks if the Qdrant collection exists (if not, resets `is_embedded = 0` for all articles to trigger a full rebuild)
 6. Embeds only unembedded articles (`is_embedded = 0`) and uploads to Qdrant, marking each article as embedded per-article after successful upload
 
-### FastAPI server (chatbot backend)
+### FastAPI server (chatbot backend + admin dashboard)
 
 ```bash
 python run.py
 ```
 
-Starts uvicorn on `0.0.0.0:8000` with hot reload. Endpoints:
+Starts uvicorn on `0.0.0.0:8000` with hot reload. Serves everything in one process:
+
+**Chatbot endpoints:**
 - `GET  /` — welcome message
 - `GET  /health` — health check
 - `POST /chat/` — ask a question
+
+**Admin API (see full reference below):**
+- `GET  /api/admin/stats` — dashboard summary
+- `GET  /api/admin/knowledge` — list all articles
+- `GET  /api/admin/knowledge/{id}` — article detail
+- `DELETE /api/admin/knowledge/{id}` — delete article
+- `POST /api/admin/scrape` — trigger scraper
+- `POST /api/admin/embedding` — trigger embedding
+- `POST /api/admin/rebuild` — full rebuild
+- `GET  /api/admin/logs` — operational logs
+- `POST /api/admin/chat-test` — test chat
+- `GET  /api/admin/health` — multi-component health
+
+**Dashboard frontend:**
+- `GET  /dashboard` — Arabic admin dashboard UI
 
 ### Scraper only
 
@@ -266,6 +335,15 @@ uv run python scripts/check_duplicate_urls.py
 
 # Deduplicate MySQL blog URLs (dry-run by default — set DRY_RUN=False inside the script to execute)
 uv run python scripts/dedupe_mysql_blog_urls.py
+
+# Create dashboard_logs table (operational event log)
+uv run python scripts/migrate_001_create_dashboard_logs.py
+
+# Create chat_logs table (chat analytics)
+uv run python scripts/migrate_002_create_chat_logs.py
+
+# Verify chat_logs insert/select/delete workflow
+uv run python scripts/verify_chat_logs.py
 ```
 
 ### Embedding trigger endpoint (standalone server)
@@ -384,6 +462,210 @@ curl -X POST http://localhost:8001/run-embedding
 
 ---
 
+### `POST /api/admin/scrape`
+
+Trigger the scraper in a background thread. Uses a threading lock to prevent concurrent maintenance jobs.
+
+**Request Body:** None
+
+**Response** `200 OK`
+```json
+{"success": true, "message": "Scraper started"}
+```
+
+If a job is already running:
+```json
+{"success": true, "message": "Scraping is already running"}
+```
+
+---
+
+### `POST /api/admin/embedding`
+
+Run the embedding pipeline (incremental — only unembedded articles) in a background thread.
+
+**Request Body:** None
+
+**Response** `200 OK`
+```json
+{"success": true, "message": "Embedding started"}
+```
+
+If a job is already running:
+```json
+{"success": true, "message": "Embedding is already running"}
+```
+
+---
+
+### `POST /api/admin/rebuild`
+
+Full rebuild: resets `is_embedded = 0` for all articles, then re-embeds and uploads everything to Qdrant. Runs in a background thread.
+
+**Request Body:** None
+
+**Response** `200 OK`
+```json
+{"success": true, "message": "Rebuild started"}
+```
+
+If a job is already running:
+```json
+{"success": true, "message": "A maintenance job is already running"}
+```
+
+---
+
+### `GET /api/admin/stats`
+
+Dashboard summary statistics.
+
+**Response** `200 OK`
+```json
+{
+  "success": true,
+  "data": {
+    "total_articles": 42,
+    "embedded_articles": 40,
+    "pending_articles": 2,
+    "total_questions": 150,
+    "last_scrape_time": "2026-06-17T10:30:00",
+    "last_embedding_time": "2026-06-17T11:00:00"
+  }
+}
+```
+
+---
+
+### `GET /api/admin/knowledge`
+
+List all articles in the knowledge base.
+
+**Query Parameters**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | int | 50 | Max results (capped at 200) |
+
+**Response** `200 OK`
+```json
+{
+  "success": true,
+  "data": [
+    {"id": 1, "title": "أسباب تسوس الأسنان", "url": "https://...", "is_embedded": 1, "created_at": "2026-06-01T12:00:00"}
+  ]
+}
+```
+
+---
+
+### `GET /api/admin/knowledge/{id}`
+
+Full article details including content.
+
+**Response** `200 OK`
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "title": "أسباب تسوس الأسنان",
+    "url": "https://blog.asnany.net/...",
+    "content": "نص المقال الكامل...",
+    "is_embedded": 1,
+    "created_at": "2026-06-01T12:00:00",
+    "updated_at": "2026-06-17T11:00:00"
+  }
+}
+```
+
+**Response** `404`
+```json
+{"success": false, "message": "Knowledge not found"}
+```
+
+---
+
+### `DELETE /api/admin/knowledge/{id}`
+
+Delete an article and all its chunks. Removes from MySQL, Qdrant (all points with matching `blog_id`), and logs the event.
+
+**Response** `200 OK`
+```json
+{"success": true, "message": "Knowledge deleted"}
+```
+
+**Response** `404`
+```json
+{"success": false, "message": "Knowledge not found"}
+```
+
+---
+
+### `GET /api/admin/logs`
+
+Recent operational events from the `dashboard_logs` table.
+
+**Query Parameters**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | int | 50 | Number of log entries (capped at 200) |
+
+**Response** `200 OK`
+```json
+{
+  "success": true,
+  "data": [
+    {"id": 1, "event_type": "rebuild_completed", "message": "Pipeline completed successfully", "created_at": "2026-06-17T11:00:00"}
+  ]
+}
+```
+
+---
+
+### `POST /api/admin/chat-test`
+
+Dashboard-internal chat wrapper. Mirrors `POST /chat/` with the same greeting detection, retrieval, and generation logic.
+
+**Request Body**
+```json
+{"query": "ما هي أسباب تسوس الأسنان؟"}
+```
+
+**Response** `200 OK`
+```json
+{
+  "reply": "تسوس الأسنان يحدث بسبب...",
+  "sources": [
+    {"title": "أسباب تسوس الأسنان وعلاجه", "url": "https://blog.asnany.net/..."}
+  ]
+}
+```
+
+---
+
+### `GET /api/admin/health`
+
+Multi-component health check.
+
+**Response** `200 OK`
+```json
+{
+  "success": true,
+  "data": {
+    "api": {"status": "ok"},
+    "mysql": {"status": "ok"},
+    "qdrant": {"status": "ok"},
+    "groq": {"status": "ok"}
+  }
+}
+```
+
+If a component is down, its `status` will be `"error"` with a `message` field.
+
+---
+
 ## How RAG Works
 
 ### Step 1: Article Ingestion
@@ -403,7 +685,7 @@ curl -X POST http://localhost:8001/run-embedding
 5. **Fetch sources** — The unique `blog_id` values from the retrieved chunks are used to look up the article title and URL from MySQL.
 6. **Build context** — Retrieved chunks are assembled into a structured context (up to `CONTEXT_MAX_CHARS` characters) with `[CHUNK 1] TEXT: ...` markers.
 7. **Generate answer** — The system prompt, user question, and context are sent to Groq's `openai/gpt-oss-20b` model with retry logic (4 attempts, exponential backoff). The prompt instructs the LLM to answer in Arabic, use the context as its primary reference, avoid fabricating statistics, and never mention sources or URLs in the answer text.
-8. **Return** — The LLM's answer is cleaned of Arabic diacritics, deduplicated source links are appended, and the final `{reply, sources}` response is returned to the user and logged to `chat_logs.jsonl` (logging can be disabled via `ENABLE_CHAT_LOGS=false`).
+8. **Return** — The LLM's answer is cleaned of Arabic diacritics, deduplicated source links are appended, and the final `{reply, sources}` response is returned to the user. The interaction is logged to `chat_logs.jsonl` and the `chat_logs` MySQL table (with `response_time_ms` and `sources_count`); both can be disabled via `ENABLE_CHAT_LOGS=false`.
 
 ---
 
@@ -415,23 +697,26 @@ curl -X POST http://localhost:8001/run-embedding
   - `scraper/articles.csv` — MySQL backup export
   - `.cache/` — HuggingFace model cache
 - **Dynamic API URL in frontend:** The chat widget at `web/index.html` dynamically selects the API base URL based on the hostname: `localhost`/`127.0.0.1` → `http://localhost:8000`, otherwise → `https://blog-chat.alahliadental.com`. Change the production URL to match your deployment.
+- **Dashboard authentication:** The admin dashboard at `/dashboard` and all `/api/admin` endpoints have no authentication. Add API key validation or a reverse proxy for production use.
+- **Database migrations:** New deployments must run `scripts/migrate_001_create_dashboard_logs.py` and `scripts/migrate_002_create_chat_logs.py` to create the required operational tables. The `blog` table is auto-created by `main.py`.
 - **CORS:** The FastAPI server allows all origins (`allow_origins=["*"]`). Restrict this in production.
-- **No authentication:** The API has no authentication layer. Add API key validation or a reverse proxy for production use.
+- **No authentication:** The chat API has no authentication layer. Add API key validation or a reverse proxy for production use.
 
 ---
 
 ## Known Limitations
 
-1. **Dynamic API URL (still environment-specific)** — `web/index.html` selects the API URL based on hostname, but custom deployments must edit `const API_BASE` logic in the frontend.
+1. **Dynamic API URL (still environment-specific)** — `web/index.html` selects the API URL based on hostname, but custom deployments must edit `const API_BASE` logic in the frontend. The dashboard at `dashboard/index.html` has the same pattern.
 2. **Synchronous architecture** — All Qdrant, MySQL, and Groq calls are synchronous (`def`, not `async def`). Long requests block the entire event loop.
 3. **Character-based chunking** — Text is split at exact character boundaries (800 chars, 200 overlap), which can cut sentences or words in half. No sentence-aware or semantic splitting is used.
 4. **No similarity threshold** — The retriever returns the top-K results regardless of how low the similarity score is, which can lead to irrelevant context being fed to the LLM.
 5. **Wide-open CORS** — `allow_origins=["*"]` allows any website to call the API.
 6. **No rate limiting** — The chat endpoint has no request rate limiting or throttling.
 7. **No caching** — Every query independently embeds the input, searches Qdrant, fetches from MySQL, and calls Groq. Repeated identical queries are processed fresh each time.
-8. **No user authentication** — The API is fully open; there is no mechanism to identify or restrict users.
+8. **No user authentication** — The API and dashboard are fully open; there is no mechanism to identify or restrict users.
 9. **Inconsistent default values** — `QDRANT_TIMEOUT` defaults to `120` in `main.py` but `60` in `qdrant_retriever.py`.
 10. **Large model download** — The embedding model (~1.1 GB) downloads on first run, which can be slow and requires substantial disk space.
+11. **No dashboard authentication** — The admin dashboard and all `/api/admin` endpoints are fully open. Anyone with network access can view stats, delete knowledge, and trigger maintenance jobs.
 
 ---
 

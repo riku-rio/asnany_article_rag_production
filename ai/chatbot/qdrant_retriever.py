@@ -52,7 +52,7 @@ _model: Optional[SentenceTransformer] = None
 def get_model() -> SentenceTransformer:
     global _model
     if _model is None:
-        print("🧠 Loading query embedding model...")
+        print("Loading query embedding model...")
         _model = SentenceTransformer(HF_MODEL, token=HF_TOKEN)
     return _model
 

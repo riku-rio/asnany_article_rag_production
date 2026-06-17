@@ -15,6 +15,7 @@ CSV_PATH = BASE_DIR.parent / "scraper" / "articles.csv"
 
 from database.db import get_connection
 from database.tables.blog import create_blog_table
+from database.dashboard_logger import log_event
 from database.embedder import embed_blog_articles
 from database.qdrant_uploader import upload_embeddings
 from scraper.asnany_scraper import normalize_url
@@ -221,22 +222,28 @@ def embed_and_upload_blog_articles() -> None:
 
     print("🧠 Starting blog embeddings pipeline...")
 
-    # 1) Prepare points for ONLY unembedded articles
-    points = embed_blog_articles()
-
-    if not points:
-        print("⚠️ No new embeddings generated — skipping upload")
-        return
-
-    # 2) Group by blog_id so we can mark per article after successful upload
-    grouped = _group_points_by_blog_id(points)
-    blog_ids = list(grouped.keys())
-
-    print(f"📦 Articles to upload: {len(blog_ids)}")
-
     conn = get_connection()
 
     try:
+        log_event("embedding_started", "Embedding pipeline started", conn=conn)
+
+        # 1) Prepare points for ONLY unembedded articles
+        points = embed_blog_articles()
+
+        if not points:
+            print("⚠️ No new embeddings generated — skipping upload")
+            log_event(
+                "embedding_completed",
+                "No new embeddings to process",
+                conn=conn,
+            )
+            return
+
+        # 2) Group by blog_id so we can mark per article after successful upload
+        grouped = _group_points_by_blog_id(points)
+        blog_ids = list(grouped.keys())
+
+        print(f"📦 Articles to upload: {len(blog_ids)}")
         # Ensure table exists (safe)
         create_blog_table(conn)
 
@@ -257,11 +264,17 @@ def embed_and_upload_blog_articles() -> None:
             print(f"✅ Marked embedded: blog_id={blog_id} ({uploaded_articles}/{len(blog_ids)})")
 
         print("🚀 Blog embeddings pipeline completed")
+        log_event(
+            "embedding_completed",
+            f"{uploaded_articles} articles embedded successfully",
+            conn=conn,
+        )
 
     except Exception as e:
         conn.rollback()
         print("❌ Embeddings pipeline failed — rollback SQL marking")
-        raise e
+        log_event("embedding_failed", str(e), conn=conn)
+        raise
 
     finally:
         conn.close()

@@ -283,7 +283,7 @@ def _call_groq_chat(
             if content is None:
                 return ""
             if not isinstance(content, str):
-                print("⚠️ Groq returned non-text content")
+                print("[!] Groq returned non-text content")
                 return TRANSIENT_ERROR_MESSAGE
 
             return content.strip()
