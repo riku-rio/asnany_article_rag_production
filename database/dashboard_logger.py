@@ -16,6 +16,15 @@ SUPPORTED_EVENTS = frozenset({
     "knowledge_added",
     "knowledge_deleted",
     "system_error",
+    "user_logged_in",
+    "user_logged_out",
+    "user_created",
+    "user_updated",
+    "user_disabled",
+    "user_enabled",
+    "user_deleted",
+    "user_password_reset",
+    "login_failed",
 })
 
 

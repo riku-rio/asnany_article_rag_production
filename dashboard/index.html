@@ -58,6 +58,9 @@
   .header-status { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #4caf50; }
   .header-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #4caf50; }
   .header-actions { display: flex; align-items: center; gap: 8px; }
+  .header-user { font-size: 13px; color: var(--text-secondary); padding: 0 8px; }
+  .header-logout-btn { background: none; border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; color: var(--badge-error-text); transition: background 0.15s; }
+  .header-logout-btn:hover { background: var(--badge-error-bg); }
   .theme-toggle { background: none; border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 16px; line-height: 1; color: var(--text-secondary); transition: background 0.15s; }
   .theme-toggle:hover { background: var(--bg-sidebar-hover); }
 
@@ -83,6 +86,32 @@
   .kpi-value { font-size: 28px; font-weight: 600; color: var(--text-heading); }
 
   .placeholder-text { color: var(--text-secondary); font-size: 14px; text-align: center; padding: 48px 0; }
+
+  /* --- Login Screen --- */
+  #loginScreen {
+    position: fixed; inset: 0; z-index: 2000;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg-body);
+  }
+  #loginScreen.hidden { display: none; }
+  .login-box {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 40px 36px;
+    width: min(380px, calc(100vw - 32px));
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+  }
+  .login-title { font-size: 20px; font-weight: 600; color: var(--text-heading); margin-bottom: 4px; text-align: center; }
+  .login-subtitle { font-size: 14px; color: var(--text-secondary); margin-bottom: 28px; text-align: center; }
+  .login-field { margin-bottom: 16px; }
+  .login-field label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+  .login-field input { width: 100%; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-surface); color: var(--text-primary); outline: none; }
+  .login-field input:focus { border-color: var(--color-accent); }
+  .login-btn { width: 100%; padding: 10px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; background: var(--color-accent); color: #fff; transition: opacity 0.15s; }
+  .login-btn:hover { opacity: 0.9; }
+  .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .login-error { font-size: 13px; color: var(--badge-error-text); margin-top: 12px; text-align: center; display: none; }
 
   /* --- Chat Test --- */
   #chatQuery { width:100%; border:1px solid var(--border-color); border-radius:6px; padding:10px 12px; font-size:15px; font-family:inherit; resize:vertical; background:var(--bg-surface); color:var(--text-primary); line-height:1.6; }
@@ -116,11 +145,9 @@
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 24px;
-
     width: min(480px, calc(100vw - 32px));
     min-width: 0;
     max-width: calc(100vw - 32px);
-
     box-shadow: 0 8px 24px rgba(0,0,0,0.2);
     overflow: hidden;
   }
@@ -156,12 +183,10 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
-
     white-space: normal;
     overflow-wrap: anywhere;
     word-wrap: break-word;
     word-break: break-all;
-
     direction: ltr;
     unicode-bidi: isolate;
   }
@@ -201,9 +226,21 @@
   .op-btn-primary:hover { opacity: 0.9; color: #fff; }
   .modal-input { width: 100%; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-surface); color: var(--text-primary); outline: none; }
   .modal-input:focus { border-color: var(--color-accent); }
+  .modal-select { width: 100%; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-surface); color: var(--text-primary); outline: none; }
+  .modal-select:focus { border-color: var(--color-accent); }
   .op-status { font-size: 13px; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 6px; }
   .op-feedback-success { background: var(--badge-success-bg); color: var(--badge-success-text); padding: 10px 14px; border-radius: 6px; font-size: 13px; }
   .op-feedback-error { background: var(--badge-error-bg); color: var(--badge-error-text); padding: 10px 14px; border-radius: 6px; font-size: 13px; }
+
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
+  .form-group .modal-input,
+  .form-group .modal-select { margin-top: 0; }
+
+  .user-role-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+  .user-role-badge.owner { background: #e8eaf6; color: #283593; }
+  .user-role-badge.admin { background: var(--badge-success-bg); color: var(--badge-success-text); }
+  html.theme-dark .user-role-badge.owner { background: #1a237e; color: #9fa8da; }
 
   @media (max-width: 700px) {
     .sidebar { width: 56px; }
@@ -216,10 +253,31 @@
 </style>
 </head>
 <body>
-<div class="app">
+<!-- Login Screen -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-title">RAG Dashboard</div>
+    <div class="login-subtitle">Sign in to continue</div>
+    <div class="login-field">
+      <label for="loginUsername">Username</label>
+      <input type="text" id="loginUsername" placeholder="Enter username" autocomplete="username" autofocus>
+    </div>
+    <div class="login-field">
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" placeholder="Enter password" autocomplete="current-password">
+    </div>
+    <button id="loginBtn" class="login-btn">Sign In</button>
+    <div id="loginError" class="login-error"></div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div class="app" id="dashboardApp">
   <header class="header">
     <div class="header-title">RAG Dashboard</div>
     <div class="header-actions">
+      <span class="header-user" id="headerUserInfo"></span>
+      <button class="header-logout-btn" id="logoutBtn" style="display:none;">Logout</button>
       <div class="header-status">
         <span class="header-status-dot"></span>
         Online
@@ -249,6 +307,10 @@
       <button class="sidebar-item" data-tab="chat-test">
         <span class="sidebar-icon">&#9993;</span>
         <span>Chat Test</span>
+      </button>
+      <button class="sidebar-item" data-tab="users">
+        <span class="sidebar-icon">&#9737;</span>
+        <span>Users</span>
       </button>
       <button class="sidebar-item" data-tab="logs">
         <span class="sidebar-icon">&#9776;</span>
@@ -357,6 +419,32 @@
         </div>
       </section>
 
+      <section class="section" id="section-users">
+        <h1 class="section-title">Users</h1>
+        <p class="section-desc">Manage dashboard users</p>
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <button id="addUserBtn" class="op-btn op-btn-add">+ Add User</button>
+          <span id="usersStatus" class="op-status"></span>
+        </div>
+        <div id="usersTableContainer">
+          <table class="knowledge-table" id="usersTable">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Username</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Last Login</th>
+                <th>Created At</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody"></tbody>
+          </table>
+          <div id="usersEmpty" class="empty-state" style="display:none;">No users found</div>
+        </div>
+      </section>
+
       <section class="section" id="section-logs">
         <h1 class="section-title">Logs</h1>
         <p class="section-desc">System activity log</p>
@@ -388,87 +476,10 @@
 
 <script>
   (function() {
-    var sidebar = document.getElementById('sidebar');
-    var sections = {
-      overview: document.getElementById('section-overview'),
-      knowledge: document.getElementById('section-knowledge'),
-      scraper: document.getElementById('section-scraper'),
-      embedding: document.getElementById('section-embedding'),
-      'chat-test': document.getElementById('section-chat-test'),
-      logs: document.getElementById('section-logs'),
-      health: document.getElementById('section-health')
-    };
+    /* ==================== Auth State ==================== */
+    var currentUser = null;
 
-    sidebar.addEventListener('click', function(e) {
-      var btn = e.target.closest('.sidebar-item');
-      if (!btn) return;
-      var tab = btn.getAttribute('data-tab');
-      if (!tab) return;
-      sidebar.querySelectorAll('.sidebar-item').forEach(function(item) {
-        item.classList.remove('active');
-      });
-      btn.classList.add('active');
-      Object.keys(sections).forEach(function(key) {
-        sections[key].classList.remove('active');
-      });
-      var target = sections[tab];
-      if (target) target.classList.add('active');
-      if (tab === 'overview') fetchOverviewStats();
-      if (tab === 'knowledge') fetchKnowledge();
-      if (tab === 'scraper' || tab === 'embedding') updateLastRunTimes();
-      if (tab === 'logs') fetchLogs();
-      if (tab === 'health') fetchHealth();
-    });
-
-    /* --- Theme --- */
-    var currentTheme = localStorage.getItem('theme') || 'system';
-    var darkMedia = window.matchMedia('(prefers-color-scheme: dark)');
-
-    function applyTheme(mode) {
-      if (mode === 'system') {
-        document.documentElement.classList.toggle('theme-dark', darkMedia.matches);
-      } else {
-        document.documentElement.classList.toggle('theme-dark', mode === 'dark');
-      }
-      updateToggleButton(mode);
-    }
-
-    function setTheme(mode) {
-      currentTheme = mode;
-      localStorage.setItem('theme', mode);
-      applyTheme(mode);
-    }
-
-    function toggleTheme() {
-      var order = ['system', 'light', 'dark'];
-      var idx = order.indexOf(currentTheme);
-      setTheme(order[(idx + 1) % 3]);
-    }
-
-    function updateToggleButton(mode) {
-      var btn = document.getElementById('themeToggle');
-      if (!btn) return;
-
-      btn.textContent =
-        mode === 'system'
-          ? '🌓'
-          : mode === 'light'
-          ? '☀️'
-          : '🌙';
-
-      btn.title = mode.charAt(0).toUpperCase() + mode.slice(1) + ' theme';
-    }
-
-    darkMedia.addEventListener('change', function() {
-      if (currentTheme === 'system') applyTheme('system');
-    });
-
-    applyTheme(currentTheme);
-
-    var themeToggle = document.getElementById('themeToggle');
-    if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
-
-    /* --- Utilities --- */
+    /* ==================== Utilities ==================== */
     window.showSpinner = function(container) {
       var el = document.createElement('div');
       el.className = 'spinner';
@@ -534,6 +545,240 @@
       return '<span class="badge badge-' + (variant || 'success') + '">' + text + '</span>';
     };
 
+    function escapeHtml(str) {
+      if (!str) return '';
+      var div = document.createElement('div');
+      div.appendChild(document.createTextNode(str));
+      return div.innerHTML;
+    }
+
+    function getErrorMessage(data) {
+      if (!data) return 'Unknown error';
+      if (data.message) return data.message;
+      if (typeof data.detail === 'string') return data.detail;
+      if (data.detail && data.detail.message) return data.detail.message;
+      if (data.detail && typeof data.detail === 'object') return JSON.stringify(data.detail);
+      return 'Unknown error';
+    }
+
+    /* ==================== Auth ==================== */
+    var loginScreen = document.getElementById('loginScreen');
+    var dashboardApp = document.getElementById('dashboardApp');
+    var loginUsername = document.getElementById('loginUsername');
+    var loginPassword = document.getElementById('loginPassword');
+    var loginBtn = document.getElementById('loginBtn');
+    var loginError = document.getElementById('loginError');
+    var logoutBtn = document.getElementById('logoutBtn');
+    var headerUserInfo = document.getElementById('headerUserInfo');
+
+    function showDashboard(user) {
+      currentUser = user;
+      loginScreen.classList.add('hidden');
+      dashboardApp.style.display = 'flex';
+      logoutBtn.style.display = '';
+      headerUserInfo.textContent = (user.display_name || user.username) + ' (' + user.role + ')';
+      loginError.style.display = 'none';
+      initDashboard();
+      updateLastRunTimes();
+      fetchOverviewStats();
+      fetchHealth();
+    }
+
+    function checkAuth() {
+      fetch('/api/admin/auth/me')
+        .then(function(r) {
+          if (!r.ok) {
+            showLogin();
+            return null;
+          }
+          return r.json();
+        })
+        .then(function(data) {
+          if (data && data.success && data.user) {
+            showDashboard(data.user);
+          } else {
+            showLogin();
+          }
+        })
+        .catch(function() {
+          showLogin();
+        });
+    }
+
+    function doLogin() {
+      var username = loginUsername.value.trim();
+      var password = loginPassword.value;
+
+      if (!username || !password) {
+        loginError.textContent = 'Please enter username and password';
+        loginError.style.display = 'block';
+        return;
+      }
+
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Signing in...';
+      loginError.style.display = 'none';
+
+      fetch('/api/admin/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username, password: password })
+      })
+        .then(function(r) {
+          return r.json().then(function(data) {
+            if (!r.ok) {
+              throw new Error(getErrorMessage(data) || 'Invalid username or password');
+            }
+            return data;
+          });
+        })
+        .then(function(data) {
+          if (data.success && data.user) {
+            showDashboard(data.user);
+          } else {
+            throw new Error(data.message || 'Login failed');
+          }
+        })
+        .catch(function(err) {
+          loginError.textContent = err.message || 'Invalid username or password';
+          loginError.style.display = 'block';
+        })
+        .finally(function() {
+          loginBtn.disabled = false;
+          loginBtn.textContent = 'Sign In';
+        });
+    }
+
+    function doLogout() {
+      fetch('/api/admin/auth/logout', { method: 'POST' })
+        .then(function() {
+          currentUser = null;
+          showLogin();
+        })
+        .catch(function() {
+          currentUser = null;
+          showLogin();
+        });
+    }
+
+    function showLogin() {
+      currentUser = null;
+      loginScreen.classList.remove('hidden');
+      dashboardApp.style.display = 'none';
+      logoutBtn.style.display = 'none';
+      headerUserInfo.textContent = '';
+      loginError.style.display = 'none';
+      loginUsername.value = '';
+      loginPassword.value = '';
+      loginUsername.focus();
+    }
+
+    loginBtn.addEventListener('click', doLogin);
+    loginPassword.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') doLogin();
+    });
+    loginUsername.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') doLogin();
+    });
+    logoutBtn.addEventListener('click', doLogout);
+
+    /* ==================== Init Check ==================== */
+    checkAuth();
+
+    /* ==================== Dashboard UI ==================== */
+    var sidebar = document.getElementById('sidebar');
+    var sections = {
+      overview: document.getElementById('section-overview'),
+      knowledge: document.getElementById('section-knowledge'),
+      scraper: document.getElementById('section-scraper'),
+      embedding: document.getElementById('section-embedding'),
+      'chat-test': document.getElementById('section-chat-test'),
+      users: document.getElementById('section-users'),
+      logs: document.getElementById('section-logs'),
+      health: document.getElementById('section-health')
+    };
+    var _initialized = false;
+
+    function initDashboard() {
+      if (_initialized) return;
+      _initialized = true;
+      bindSidebar();
+      bindTheme();
+      bindKnowledge();
+      bindScraper();
+      bindEmbedding();
+      bindChat();
+      bindHealth();
+      bindLogs();
+      bindUsers();
+    }
+
+    function bindSidebar() {
+      sidebar.addEventListener('click', function(e) {
+        var btn = e.target.closest('.sidebar-item');
+        if (!btn) return;
+        var tab = btn.getAttribute('data-tab');
+        if (!tab) return;
+        sidebar.querySelectorAll('.sidebar-item').forEach(function(item) {
+          item.classList.remove('active');
+        });
+        btn.classList.add('active');
+        Object.keys(sections).forEach(function(key) {
+          sections[key].classList.remove('active');
+        });
+        var target = sections[tab];
+        if (target) target.classList.add('active');
+        if (tab === 'overview') fetchOverviewStats();
+        if (tab === 'knowledge') fetchKnowledge();
+        if (tab === 'scraper' || tab === 'embedding') updateLastRunTimes();
+        if (tab === 'users') fetchUsers();
+        if (tab === 'logs') fetchLogs();
+        if (tab === 'health') fetchHealth();
+      });
+    }
+
+    /* --- Theme --- */
+    var currentTheme = localStorage.getItem('theme') || 'system';
+    var darkMedia = window.matchMedia('(prefers-color-scheme: dark)');
+
+    function applyTheme(mode) {
+      if (mode === 'system') {
+        document.documentElement.classList.toggle('theme-dark', darkMedia.matches);
+      } else {
+        document.documentElement.classList.toggle('theme-dark', mode === 'dark');
+      }
+      updateToggleButton(mode);
+    }
+
+    function setTheme(mode) {
+      currentTheme = mode;
+      localStorage.setItem('theme', mode);
+      applyTheme(mode);
+    }
+
+    function toggleTheme() {
+      var order = ['system', 'light', 'dark'];
+      var idx = order.indexOf(currentTheme);
+      setTheme(order[(idx + 1) % 3]);
+    }
+
+    function updateToggleButton(mode) {
+      var btn = document.getElementById('themeToggle');
+      if (!btn) return;
+      btn.textContent =
+        mode === 'system' ? '🌓' : mode === 'light' ? '☀️' : '🌙';
+      btn.title = mode.charAt(0).toUpperCase() + mode.slice(1) + ' theme';
+    }
+
+    function bindTheme() {
+      darkMedia.addEventListener('change', function() {
+        if (currentTheme === 'system') applyTheme('system');
+      });
+      applyTheme(currentTheme);
+      var themeToggle = document.getElementById('themeToggle');
+      if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
+    }
+
     /* --- Add Knowledge Modal --- */
     window.showAddKnowledgeModal = function() {
       var overlay = document.createElement('div');
@@ -552,7 +797,7 @@
         '<div class="modal-body">' +
           '<label style="display:block;font-size:14px;color:var(--text-secondary);margin-bottom:6px;">Article URL</label>' +
           '<input type="url" id="addKnowledgeUrl" class="modal-input" placeholder="https://example.com/article" autofocus>' +
-          '<div id="addKnowledgeProgress" style="display:none;align-items:center;gap:8px;font-size:14px;color:var(--text-secondary);">' +
+          '<div id="addKnowledgeProgress" style="display:none;align-items:center;gap:8px;font-size:14px;color:var(--text-secondary);margin-top:12px;">' +
             '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Processing...' +
           '</div>' +
         '</div>' +
@@ -581,10 +826,7 @@
 
       submitBtn.addEventListener('click', function() {
         var url = urlInput.value.trim();
-        if (!url) {
-          showToast('Please enter a URL', 'error');
-          return;
-        }
+        if (!url) { showToast('Please enter a URL', 'error'); return; }
         setLoading(true);
 
         fetch('/api/admin/knowledge/add-url', {
@@ -595,8 +837,7 @@
           .then(function(r) {
             return r.json().then(function(data) {
               if (!r.ok) {
-                if (data.detail) throw new Error(data.detail);
-                throw new Error('HTTP ' + r.status);
+                throw new Error(getErrorMessage(data) || 'HTTP ' + r.status);
               }
               return data;
             });
@@ -614,14 +855,13 @@
             }
           })
           .catch(function(err) {
-            console.error('Failed to add knowledge:', err);
             showToast(err.message || 'Failed to add knowledge', 'error');
             setLoading(false);
           });
       });
 
       urlInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') { submitBtn.click(); }
+        if (e.key === 'Enter') submitBtn.click();
       });
 
       setTimeout(function() { urlInput.focus(); }, 100);
@@ -631,13 +871,6 @@
     var knowledgeData = [];
     var knowledgeSearchEl = document.getElementById('knowledgeSearch');
     var knowledgeTableContainer = document.getElementById('knowledgeTableContainer');
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      var div = document.createElement('div');
-      div.appendChild(document.createTextNode(str));
-      return div.innerHTML;
-    }
 
     function filteredKnowledge() {
       var term = knowledgeSearchEl ? knowledgeSearchEl.value.trim().toLowerCase() : '';
@@ -696,7 +929,6 @@
           renderKnowledgeTable(filteredKnowledge());
         })
         .catch(function(err) {
-          console.error('Failed to load knowledge:', err);
           showToast('Failed to load knowledge entries', 'error');
         })
         .finally(function() {
@@ -704,84 +936,82 @@
         });
     }
 
-    if (knowledgeSearchEl) {
-      knowledgeSearchEl.addEventListener('input', function() {
-        renderKnowledgeTable(filteredKnowledge());
+    function bindKnowledge() {
+      if (knowledgeSearchEl) {
+        knowledgeSearchEl.addEventListener('input', function() {
+          renderKnowledgeTable(filteredKnowledge());
+        });
+      }
+      document.getElementById('addKnowledgeBtn').addEventListener('click', showAddKnowledgeModal);
+
+      knowledgeTableContainer.addEventListener('click', function(e) {
+        var btn = e.target.closest('button');
+        if (!btn) return;
+        var tr = btn.closest('tr');
+        var id = tr ? parseInt(tr.dataset.id) : null;
+        if (!id) return;
+
+        if (btn.classList.contains('view-btn')) {
+          var loadingOverlay = openModal({
+            title: 'Loading...',
+            body: '<p>Loading knowledge details...</p>',
+            cancelText: null,
+            confirmText: null
+          });
+          fetch('/api/admin/knowledge/' + id)
+            .then(function(r) {
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+              return r.json();
+            })
+            .then(function(item) {
+              closeModal(loadingOverlay);
+              openModal({
+                title: escapeHtml(item.title),
+                body:
+                  '<p class="modal-url-line"><a class="modal-url" href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(item.url) + '</a></p>' +
+                  '<div style="max-height:300px;overflow-y:auto;background:var(--bg-body);padding:12px;border-radius:4px;font-size:13px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;color:var(--text-primary);margin-top:8px;">' + escapeHtml(item.content) + '</div>',
+                confirmText: null,
+                cancelText: 'Close'
+              });
+            })
+            .catch(function(err) {
+              closeModal(loadingOverlay);
+              showToast('Failed to load knowledge details', 'error');
+            });
+        }
+
+        if (btn.classList.contains('delete-btn')) {
+          openModal({
+            title: 'Confirm Delete',
+            body: '<p>Are you sure you want to delete this knowledge entry? This action cannot be undone.</p>',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            onConfirm: function() {
+              var delSpinner = showSpinner(document.body);
+              fetch('/api/admin/knowledge/' + id, { method: 'DELETE' })
+                .then(function(r) {
+                  if (!r.ok) throw new Error('HTTP ' + r.status);
+                  return r.json();
+                })
+                .then(function() {
+                  showToast('Knowledge entry deleted', 'success');
+                  knowledgeData = [];
+                  fetchKnowledge();
+                })
+                .catch(function(err) {
+                  showToast('Failed to delete knowledge entry', 'error');
+                })
+                .finally(function() {
+                  hideSpinner(delSpinner);
+                });
+            }
+          });
+        }
       });
     }
 
-    document.getElementById('addKnowledgeBtn').addEventListener('click', showAddKnowledgeModal);
-
-    knowledgeTableContainer.addEventListener('click', function(e) {
-      var btn = e.target.closest('button');
-      if (!btn) return;
-      var tr = btn.closest('tr');
-      var id = tr ? parseInt(tr.dataset.id) : null;
-      if (!id) return;
-
-      if (btn.classList.contains('view-btn')) {
-        var loadingOverlay = openModal({
-          title: 'Loading...',
-          body: '<p>Loading knowledge details...</p>',
-          cancelText: null,
-          confirmText: null
-        });
-        fetch('/api/admin/knowledge/' + id)
-          .then(function(r) {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.json();
-          })
-          .then(function(item) {
-            closeModal(loadingOverlay);
-            openModal({
-              title: escapeHtml(item.title),
-              body:
-                '<p class="modal-url-line"><a class="modal-url" href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(item.url) + '</a></p>' +
-                '<div style="max-height:300px;overflow-y:auto;background:var(--bg-body);padding:12px;border-radius:4px;font-size:13px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;color:var(--text-primary);margin-top:8px;">' + escapeHtml(item.content) + '</div>',
-              confirmText: null,
-              cancelText: 'Close'
-            });
-          })
-          .catch(function(err) {
-            closeModal(loadingOverlay);
-            showToast('Failed to load knowledge details', 'error');
-          });
-      }
-
-      if (btn.classList.contains('delete-btn')) {
-        openModal({
-          title: 'Confirm Delete',
-          body: '<p>Are you sure you want to delete this knowledge entry? This action cannot be undone.</p>',
-          confirmText: 'Delete',
-          cancelText: 'Cancel',
-          onConfirm: function() {
-            var delSpinner = showSpinner(document.body);
-            fetch('/api/admin/knowledge/' + id, { method: 'DELETE' })
-              .then(function(r) {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                return r.json();
-              })
-              .then(function() {
-                showToast('Knowledge entry deleted', 'success');
-                knowledgeData = [];
-                fetchKnowledge();
-              })
-              .catch(function(err) {
-                console.error('Failed to delete knowledge:', err);
-                showToast('Failed to delete knowledge entry', 'error');
-              })
-              .finally(function() {
-                hideSpinner(delSpinner);
-              });
-          }
-        });
-      }
-    });
-
     /* --- Scraper Controls --- */
-    var scraperBtn = document.getElementById('runScraperBtn');
-    var scraperStatus = document.getElementById('scraperStatus');
-    var scraperFeedback = document.getElementById('scraperFeedback');
+    var scraperBtn, scraperStatus, scraperFeedback;
 
     function showScraperFeedback(message, type) {
       scraperFeedback.style.display = 'block';
@@ -810,7 +1040,6 @@
           fetchLogs();
         })
         .catch(function(err) {
-          console.error('Scraper failed:', err);
           showScraperFeedback('Failed to start scraper', 'error');
           showToast('Failed to start scraper', 'error');
         })
@@ -820,13 +1049,15 @@
         });
     }
 
-    if (scraperBtn) scraperBtn.addEventListener('click', runScraper);
+    function bindScraper() {
+      scraperBtn = document.getElementById('runScraperBtn');
+      scraperStatus = document.getElementById('scraperStatus');
+      scraperFeedback = document.getElementById('scraperFeedback');
+      if (scraperBtn) scraperBtn.addEventListener('click', runScraper);
+    }
 
     /* --- Embedding Controls --- */
-    var embeddingBtn = document.getElementById('runEmbeddingBtn');
-    var rebuildBtn = document.getElementById('rebuildBtn');
-    var embeddingStatus = document.getElementById('embeddingStatus');
-    var embeddingFeedback = document.getElementById('embeddingFeedback');
+    var embeddingBtn, rebuildBtn, embeddingStatus, embeddingFeedback;
 
     function showEmbeddingFeedback(message, type) {
       embeddingFeedback.style.display = 'block';
@@ -860,7 +1091,6 @@
           fetchLogs();
         })
         .catch(function(err) {
-          console.error('Embedding failed:', err);
           showEmbeddingFeedback('Failed to start embedding', 'error');
           showToast('Failed to start embedding', 'error');
         })
@@ -890,14 +1120,13 @@
                 showEmbeddingFeedback(data.message, 'error');
                 showToast(data.message, 'error');
               } else {
-            showEmbeddingFeedback(data.message, 'success');
-            showToast('Rebuild started', 'success');
-          }
-          updateLastRunTimes();
-          fetchLogs();
-        })
+                showEmbeddingFeedback(data.message, 'success');
+                showToast('Rebuild started', 'success');
+              }
+              updateLastRunTimes();
+              fetchLogs();
+            })
             .catch(function(err) {
-              console.error('Rebuild failed:', err);
               showEmbeddingFeedback('Failed to start rebuild', 'error');
               showToast('Failed to start rebuild', 'error');
             })
@@ -909,17 +1138,17 @@
       });
     }
 
-    if (embeddingBtn) embeddingBtn.addEventListener('click', runEmbedding);
-    if (rebuildBtn) rebuildBtn.addEventListener('click', rebuildEverything);
+    function bindEmbedding() {
+      embeddingBtn = document.getElementById('runEmbeddingBtn');
+      rebuildBtn = document.getElementById('rebuildBtn');
+      embeddingStatus = document.getElementById('embeddingStatus');
+      embeddingFeedback = document.getElementById('embeddingFeedback');
+      if (embeddingBtn) embeddingBtn.addEventListener('click', runEmbedding);
+      if (rebuildBtn) rebuildBtn.addEventListener('click', rebuildEverything);
+    }
 
     /* --- Chat Test --- */
-    var askBtn = document.getElementById('askBtn');
-    var chatQuery = document.getElementById('chatQuery');
-    var chatStatus = document.getElementById('chatStatus');
-    var chatResponseCard = document.getElementById('chatResponseCard');
-    var chatReply = document.getElementById('chatReply');
-    var chatSources = document.getElementById('chatSources');
-    var chatSourcesCard = document.getElementById('chatSourcesCard');
+    var askBtn, chatQuery, chatStatus, chatResponseCard, chatReply, chatSources, chatSourcesCard;
 
     function askQuestion() {
       var query = chatQuery.value.trim();
@@ -957,7 +1186,6 @@
           chatSourcesCard.style.display = 'block';
         })
         .catch(function(err) {
-          console.error('Chat test failed:', err);
           showToast('Failed to get response', 'error');
           chatReply.textContent = 'Error: ' + err.message;
           chatResponseCard.style.display = 'block';
@@ -969,13 +1197,22 @@
         });
     }
 
-    if (askBtn) askBtn.addEventListener('click', askQuestion);
-    if (chatQuery) chatQuery.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) askQuestion();
-    });
+    function bindChat() {
+      askBtn = document.getElementById('askBtn');
+      chatQuery = document.getElementById('chatQuery');
+      chatStatus = document.getElementById('chatStatus');
+      chatResponseCard = document.getElementById('chatResponseCard');
+      chatReply = document.getElementById('chatReply');
+      chatSources = document.getElementById('chatSources');
+      chatSourcesCard = document.getElementById('chatSourcesCard');
+      if (askBtn) askBtn.addEventListener('click', askQuestion);
+      if (chatQuery) chatQuery.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) askQuestion();
+      });
+    }
 
     /* --- Health --- */
-    var refreshHealthBtn = document.getElementById('refreshHealthBtn');
+    var refreshHealthBtn;
 
     function fetchHealth() {
       var container = document.getElementById('healthCards');
@@ -1011,7 +1248,10 @@
         });
     }
 
-    if (refreshHealthBtn) refreshHealthBtn.addEventListener('click', fetchHealth);
+    function bindHealth() {
+      refreshHealthBtn = document.getElementById('refreshHealthBtn');
+      if (refreshHealthBtn) refreshHealthBtn.addEventListener('click', fetchHealth);
+    }
 
     /* --- Overview --- */
     function fetchOverviewStats() {
@@ -1027,7 +1267,6 @@
           document.getElementById('overviewLastEmbedding').textContent = data.last_embedding || 'Never';
         })
         .catch(function(err) {
-          console.error('Failed to load stats:', err);
           showToast('Failed to load overview stats', 'error');
         });
 
@@ -1042,11 +1281,7 @@
     }
 
     /* --- Logs --- */
-    var refreshLogsBtn = document.getElementById('refreshLogsBtn');
-    var logsTableBody = document.getElementById('logsTableBody');
-    var logsTable = document.getElementById('logsTable');
-    var logsEmpty = document.getElementById('logsEmpty');
-    var logsStatus = document.getElementById('logsStatus');
+    var refreshLogsBtn, logsTableBody, logsTable, logsEmpty, logsStatus;
 
     function fetchLogs() {
       logsTable.style.display = 'none';
@@ -1075,7 +1310,6 @@
           });
         })
         .catch(function(err) {
-          console.error('Failed to load logs:', err);
           logsTable.style.display = 'none';
           logsEmpty.style.display = 'block';
           logsEmpty.textContent = 'Failed to load logs';
@@ -1086,7 +1320,468 @@
         });
     }
 
-    if (refreshLogsBtn) refreshLogsBtn.addEventListener('click', fetchLogs);
+    function bindLogs() {
+      refreshLogsBtn = document.getElementById('refreshLogsBtn');
+      logsTableBody = document.getElementById('logsTableBody');
+      logsTable = document.getElementById('logsTable');
+      logsEmpty = document.getElementById('logsEmpty');
+      logsStatus = document.getElementById('logsStatus');
+      if (refreshLogsBtn) refreshLogsBtn.addEventListener('click', fetchLogs);
+    }
+
+    /* --- Users --- */
+    var usersTableBody, usersTable, usersEmpty, usersStatus, addUserBtn;
+
+    function fetchUsers() {
+      usersTable.style.display = 'none';
+      usersEmpty.style.display = 'none';
+      usersStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Loading...';
+
+      fetch('/api/admin/users')
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          if (!data || data.length === 0) {
+            usersTable.style.display = 'none';
+            usersEmpty.style.display = 'block';
+            return;
+          }
+          usersTable.style.display = '';
+          usersEmpty.style.display = 'none';
+          usersTableBody.innerHTML = '';
+          data.forEach(function(u) {
+            var roleBadge = u.role === 'owner'
+              ? '<span class="user-role-badge owner">owner</span>'
+              : '<span class="user-role-badge admin">admin</span>';
+            var statusBadge = u.is_active
+              ? createBadge('Active', 'success')
+              : createBadge('Inactive', 'error');
+            var lastLogin = u.last_login_at ? new Date(u.last_login_at).toLocaleString() : 'Never';
+            var createdAt = u.created_at ? new Date(u.created_at).toLocaleString() : '';
+            var isSelf = currentUser && currentUser.id === u.id;
+
+            var actionsHtml = '<td class="actions-cell">';
+            if (!isSelf) {
+              actionsHtml += '<button class="edit-user-btn" data-id="' + u.id + '">Edit</button> ';
+              actionsHtml += '<button class="reset-pw-user-btn" data-id="' + u.id + '">Reset PW</button> ';
+              if (u.is_active) {
+                actionsHtml += '<button class="disable-user-btn" data-id="' + u.id + '" data-action="disable">Disable</button> ';
+              } else {
+                actionsHtml += '<button class="disable-user-btn" data-id="' + u.id + '" data-action="enable">Enable</button> ';
+              }
+              actionsHtml += '<button class="delete-user-btn delete-btn" data-id="' + u.id + '">Delete</button>';
+            } else {
+              actionsHtml += '<span style="color:var(--text-secondary);font-size:12px;">You</span>';
+            }
+            actionsHtml += '</td>';
+
+            var tr = document.createElement('tr');
+            tr.dataset.id = u.id;
+            tr.innerHTML =
+              '<td>' + escapeHtml(u.display_name) + '</td>' +
+              '<td>' + escapeHtml(u.username) + '</td>' +
+              '<td>' + roleBadge + '</td>' +
+              '<td>' + statusBadge + '</td>' +
+              '<td>' + escapeHtml(lastLogin) + '</td>' +
+              '<td>' + escapeHtml(createdAt) + '</td>' +
+              actionsHtml;
+            usersTableBody.appendChild(tr);
+          });
+        })
+        .catch(function(err) {
+          usersTable.style.display = 'none';
+          usersEmpty.style.display = 'block';
+          usersEmpty.textContent = 'Failed to load users';
+          showToast('Failed to load users', 'error');
+        })
+        .finally(function() {
+          usersStatus.textContent = '';
+        });
+    }
+
+    function showAddUserModal() {
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeModal(overlay);
+      });
+
+      var isOwner = currentUser && currentUser.role === 'owner';
+      var roleOptions = isOwner
+        ? '<option value="admin">Admin</option><option value="owner">Owner</option>'
+        : '<option value="admin">Admin</option>';
+
+      var box = document.createElement('div');
+      box.className = 'modal-box';
+      box.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">' +
+          '<h2 style="margin:0;">Add User</h2>' +
+          '<button class="modal-close" style="margin-top:-4px;">&times;</button>' +
+        '</div>' +
+        '<div class="modal-body">' +
+          '<div class="form-group"><label>Display Name</label><input type="text" id="addUserDisplayName" class="modal-input" placeholder="Full name"></div>' +
+          '<div class="form-group"><label>Username</label><input type="text" id="addUserUsername" class="modal-input" placeholder="username (lowercase, a-z, 0-9, _)"></div>' +
+          '<div class="form-group"><label>Password</label><input type="password" id="addUserPassword" class="modal-input" placeholder="Min 8 characters"></div>' +
+          '<div class="form-group"><label>Role</label><select id="addUserRole" class="modal-select">' + roleOptions + '</select></div>' +
+          '<div id="addUserProgress" style="display:none;align-items:center;gap:8px;font-size:14px;color:var(--text-secondary);margin-top:8px;">' +
+            '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Creating...' +
+          '</div>' +
+        '</div>' +
+        '<div class="modal-actions" style="margin-top:8px;">' +
+          '<button id="addUserCancel" class="sidebar-item" style="width:auto;padding:6px 16px;justify-content:center;">Cancel</button>' +
+          '<button id="addUserSubmit" class="op-btn op-btn-primary" style="width:auto;padding:6px 16px;justify-content:center;">Create User</button>' +
+        '</div>';
+
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      var displayNameInput = box.querySelector('#addUserDisplayName');
+      var usernameInput = box.querySelector('#addUserUsername');
+      var passwordInput = box.querySelector('#addUserPassword');
+      var roleSelect = box.querySelector('#addUserRole');
+      var cancelBtn = box.querySelector('#addUserCancel');
+      var submitBtn = box.querySelector('#addUserSubmit');
+      var progressEl = box.querySelector('#addUserProgress');
+
+      box.querySelector('.modal-close').addEventListener('click', function() { closeModal(overlay); });
+      cancelBtn.addEventListener('click', function() { closeModal(overlay); });
+
+      function setLoading(loading) {
+        cancelBtn.disabled = loading;
+        submitBtn.disabled = loading;
+        displayNameInput.disabled = loading;
+        usernameInput.disabled = loading;
+        passwordInput.disabled = loading;
+        roleSelect.disabled = loading;
+        progressEl.style.display = loading ? 'flex' : 'none';
+      }
+
+      submitBtn.addEventListener('click', function() {
+        var payload = {
+          display_name: displayNameInput.value.trim(),
+          username: usernameInput.value.trim(),
+          password: passwordInput.value,
+          role: roleSelect.value
+        };
+        if (!payload.display_name) { showToast('Display name is required', 'error'); return; }
+        if (!payload.username) { showToast('Username is required', 'error'); return; }
+        if (!payload.password) { showToast('Password is required', 'error'); return; }
+
+        setLoading(true);
+
+        fetch('/api/admin/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(function(r) {
+            return r.json().then(function(data) {
+              if (!r.ok) throw new Error(getErrorMessage(data) || 'HTTP ' + r.status);
+              return data;
+            });
+          })
+          .then(function(data) {
+            if (data.success) {
+              showToast(data.message, 'success');
+              closeModal(overlay);
+              fetchUsers();
+            } else {
+              showToast(data.message, 'error');
+              setLoading(false);
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message, 'error');
+            setLoading(false);
+          });
+      });
+
+      setTimeout(function() { displayNameInput.focus(); }, 100);
+    }
+
+    function showEditUserModal(userId, currentData) {
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeModal(overlay);
+      });
+
+      var isOwner = currentUser && currentUser.role === 'owner';
+      var roleOptions = isOwner
+        ? '<option value="admin"' + (currentData.role === 'admin' ? ' selected' : '') + '>Admin</option><option value="owner"' + (currentData.role === 'owner' ? ' selected' : '') + '>Owner</option>'
+        : '<option value="admin"' + (currentData.role === 'admin' ? ' selected' : '') + '>Admin</option>';
+
+      var box = document.createElement('div');
+      box.className = 'modal-box';
+      box.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">' +
+          '<h2 style="margin:0;">Edit User</h2>' +
+          '<button class="modal-close" style="margin-top:-4px;">&times;</button>' +
+        '</div>' +
+        '<div class="modal-body">' +
+          '<div class="form-group"><label>Display Name</label><input type="text" id="editUserDisplayName" class="modal-input" value="' + escapeHtml(currentData.display_name) + '"></div>' +
+          '<div class="form-group"><label>Role</label><select id="editUserRole" class="modal-select">' + roleOptions + '</select></div>' +
+          '<div class="form-group"><label>Status</label><select id="editUserStatus" class="modal-select">' +
+            '<option value="1"' + (currentData.is_active ? ' selected' : '') + '>Active</option>' +
+            '<option value="0"' + (!currentData.is_active ? ' selected' : '') + '>Inactive</option>' +
+          '</select></div>' +
+          '<div id="editUserProgress" style="display:none;align-items:center;gap:8px;font-size:14px;color:var(--text-secondary);margin-top:8px;">' +
+            '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Saving...' +
+          '</div>' +
+        '</div>' +
+        '<div class="modal-actions" style="margin-top:8px;">' +
+          '<button id="editUserCancel" class="sidebar-item" style="width:auto;padding:6px 16px;justify-content:center;">Cancel</button>' +
+          '<button id="editUserSubmit" class="op-btn op-btn-primary" style="width:auto;padding:6px 16px;justify-content:center;">Save</button>' +
+        '</div>';
+
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      var nameInput = box.querySelector('#editUserDisplayName');
+      var roleSelect = box.querySelector('#editUserRole');
+      var statusSelect = box.querySelector('#editUserStatus');
+      var cancelBtn = box.querySelector('#editUserCancel');
+      var submitBtn = box.querySelector('#editUserSubmit');
+      var progressEl = box.querySelector('#editUserProgress');
+
+      box.querySelector('.modal-close').addEventListener('click', function() { closeModal(overlay); });
+      cancelBtn.addEventListener('click', function() { closeModal(overlay); });
+
+      function setLoading(loading) {
+        cancelBtn.disabled = loading;
+        submitBtn.disabled = loading;
+        nameInput.disabled = loading;
+        roleSelect.disabled = loading;
+        statusSelect.disabled = loading;
+        progressEl.style.display = loading ? 'flex' : 'none';
+      }
+
+      submitBtn.addEventListener('click', function() {
+        var payload = {};
+        var name = nameInput.value.trim();
+        if (name && name !== currentData.display_name) payload.display_name = name;
+        var role = roleSelect.value;
+        if (role !== currentData.role) payload.role = role;
+        var isActive = statusSelect.value === '1';
+        if (isActive !== currentData.is_active) payload.is_active = isActive;
+
+        if (Object.keys(payload).length === 0) {
+          showToast('No changes to save', 'error');
+          return;
+        }
+
+        setLoading(true);
+
+        fetch('/api/admin/users/' + userId, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+          .then(function(r) {
+            return r.json().then(function(data) {
+              if (!r.ok) throw new Error(getErrorMessage(data) || 'HTTP ' + r.status);
+              return data;
+            });
+          })
+          .then(function(data) {
+            if (data.success) {
+              showToast(data.message, 'success');
+              closeModal(overlay);
+              fetchUsers();
+            } else {
+              showToast(data.message, 'error');
+              setLoading(false);
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message, 'error');
+            setLoading(false);
+          });
+      });
+    }
+
+    function showResetPasswordModal(userId) {
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeModal(overlay);
+      });
+
+      var box = document.createElement('div');
+      box.className = 'modal-box';
+      box.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">' +
+          '<h2 style="margin:0;">Reset Password</h2>' +
+          '<button class="modal-close" style="margin-top:-4px;">&times;</button>' +
+        '</div>' +
+        '<div class="modal-body">' +
+          '<p>Enter the new password for this user.</p>' +
+          '<div class="form-group"><label>New Password</label><input type="password" id="resetPwInput" class="modal-input" placeholder="Min 8 characters"></div>' +
+          '<div id="resetPwProgress" style="display:none;align-items:center;gap:8px;font-size:14px;color:var(--text-secondary);margin-top:8px;">' +
+            '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Resetting...' +
+          '</div>' +
+        '</div>' +
+        '<div class="modal-actions" style="margin-top:8px;">' +
+          '<button id="resetPwCancel" class="sidebar-item" style="width:auto;padding:6px 16px;justify-content:center;">Cancel</button>' +
+          '<button id="resetPwSubmit" class="op-btn op-btn-primary" style="width:auto;padding:6px 16px;justify-content:center;">Reset Password</button>' +
+        '</div>';
+
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      var passwordInput = box.querySelector('#resetPwInput');
+      var cancelBtn = box.querySelector('#resetPwCancel');
+      var submitBtn = box.querySelector('#resetPwSubmit');
+      var progressEl = box.querySelector('#resetPwProgress');
+
+      box.querySelector('.modal-close').addEventListener('click', function() { closeModal(overlay); });
+      cancelBtn.addEventListener('click', function() { closeModal(overlay); });
+
+      function setLoading(loading) {
+        cancelBtn.disabled = loading;
+        submitBtn.disabled = loading;
+        passwordInput.disabled = loading;
+        progressEl.style.display = loading ? 'flex' : 'none';
+      }
+
+      submitBtn.addEventListener('click', function() {
+        var password = passwordInput.value;
+        if (!password) { showToast('Password is required', 'error'); return; }
+
+        setLoading(true);
+
+        fetch('/api/admin/users/' + userId + '/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: password })
+        })
+          .then(function(r) {
+            return r.json().then(function(data) {
+              if (!r.ok) throw new Error(getErrorMessage(data) || 'HTTP ' + r.status);
+              return data;
+            });
+          })
+          .then(function(data) {
+            if (data.success) {
+              showToast(data.message, 'success');
+              closeModal(overlay);
+            } else {
+              showToast(data.message, 'error');
+              setLoading(false);
+            }
+          })
+          .catch(function(err) {
+            showToast(err.message, 'error');
+            setLoading(false);
+          });
+      });
+
+      setTimeout(function() { passwordInput.focus(); }, 100);
+    }
+
+    function bindUsers() {
+      usersTableBody = document.getElementById('usersTableBody');
+      usersTable = document.getElementById('usersTable');
+      usersEmpty = document.getElementById('usersEmpty');
+      usersStatus = document.getElementById('usersStatus');
+      addUserBtn = document.getElementById('addUserBtn');
+
+      if (addUserBtn) addUserBtn.addEventListener('click', showAddUserModal);
+
+      document.getElementById('usersTableContainer').addEventListener('click', function(e) {
+        var btn = e.target.closest('button');
+        if (!btn) return;
+        var userId = parseInt(btn.dataset.id);
+        if (!userId) return;
+
+        if (btn.classList.contains('edit-user-btn')) {
+          var tr = btn.closest('tr');
+          var cells = tr.querySelectorAll('td');
+          var userData = {
+            display_name: cells[0].textContent,
+            username: cells[1].textContent,
+            role: cells[2].textContent.trim().toLowerCase(),
+            is_active: cells[3].querySelector('.badge-success') ? true : false
+          };
+          showEditUserModal(userId, userData);
+        }
+
+        if (btn.classList.contains('reset-pw-user-btn')) {
+          showResetPasswordModal(userId);
+        }
+
+        if (btn.classList.contains('disable-user-btn')) {
+          var action = btn.dataset.action;
+          var newActive = action === 'enable' ? true : false;
+          var label = newActive ? 'enable' : 'disable';
+          openModal({
+            title: 'Confirm',
+            body: '<p>Are you sure you want to ' + label + ' this user?</p>',
+            confirmText: label.charAt(0).toUpperCase() + label.slice(1),
+            cancelText: 'Cancel',
+            onConfirm: function() {
+              fetch('/api/admin/users/' + userId, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: newActive })
+              })
+                .then(function(r) {
+                  return r.json().then(function(data) {
+                    if (!r.ok) throw new Error(getErrorMessage(data) || 'HTTP ' + r.status);
+                    return data;
+                  });
+                })
+                .then(function(data) {
+                  if (data.success) {
+                    showToast(data.message, 'success');
+                    fetchUsers();
+                  } else {
+                    showToast(data.message, 'error');
+                  }
+                })
+                .catch(function(err) {
+                  showToast(err.message, 'error');
+                });
+            }
+          });
+        }
+
+        if (btn.classList.contains('delete-user-btn')) {
+          openModal({
+            title: 'Confirm Delete',
+            body: '<p>Are you sure you want to delete this user? This action cannot be undone.</p>',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            onConfirm: function() {
+              var delSpinner = showSpinner(document.body);
+              fetch('/api/admin/users/' + userId, { method: 'DELETE' })
+                .then(function(r) {
+                  return r.json().then(function(data) {
+                    if (!r.ok) throw new Error(getErrorMessage(data) || 'HTTP ' + r.status);
+                    return data;
+                  });
+                })
+                .then(function(data) {
+                  if (data.success) {
+                    showToast(data.message, 'success');
+                    fetchUsers();
+                  } else {
+                    showToast(data.message, 'error');
+                  }
+                })
+                .catch(function(err) {
+                  showToast(err.message, 'error');
+                })
+                .finally(function() {
+                  hideSpinner(delSpinner);
+                });
+            }
+          });
+        }
+      });
+    }
 
     /* --- Shared --- */
     function updateLastRunTimes() {
@@ -1101,10 +1796,6 @@
         })
         .catch(function() {});
     }
-
-    updateLastRunTimes();
-    fetchOverviewStats();
-    fetchHealth();
   })();
 </script>
 </body>

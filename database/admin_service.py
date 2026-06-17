@@ -1,8 +1,11 @@
 import os
+import re
 import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
+
+import bcrypt
 
 import requests
 from qdrant_client import QdrantClient, models
@@ -388,6 +391,15 @@ _EVENT_LABELS = {
     "knowledge_added": "Knowledge Added",
     "knowledge_deleted": "Knowledge Deleted",
     "system_error": "System Error",
+    "user_logged_in": "User Logged In",
+    "user_logged_out": "User Logged Out",
+    "user_created": "User Created",
+    "user_updated": "User Updated",
+    "user_disabled": "User Disabled",
+    "user_enabled": "User Enabled",
+    "user_deleted": "User Deleted",
+    "user_password_reset": "User Password Reset",
+    "login_failed": "Login Failed",
 }
 
 
@@ -447,3 +459,389 @@ def check_health() -> Dict[str, bool]:
         pass
 
     return result
+
+
+# ======================
+# Auth / User Management
+# ======================
+
+
+def _hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def _check_password(password: str, password_hash: str) -> bool:
+    return bcrypt.checkpw(
+        password.encode("utf-8"), password_hash.encode("utf-8")
+    )
+
+
+def _validate_username(username: str) -> tuple[bool, str]:
+    username = username.strip().lower()
+    if not username:
+        return False, "Username is required"
+    if len(username) < 3 or len(username) > 32:
+        return False, "Username must be between 3 and 32 characters"
+    if not re.match(r"^[a-z0-9_]+$", username):
+        return (
+            False,
+            "Username can only contain lowercase letters, numbers, and underscores",
+        )
+    return True, username
+
+
+def _validate_password(password: str) -> tuple[bool, str]:
+    if not password:
+        return False, "Password is required"
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters"
+    if len(password) > 64:
+        return False, "Password must be at most 64 characters"
+    return True, password
+
+
+def authenticate_user(username: str, password: str) -> dict | None:
+    username = username.strip().lower()
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, display_name, username, password_hash, role, is_active FROM dashboard_users WHERE username = %s",
+                (username,),
+            )
+            user = cursor.fetchone()
+        if not user:
+            return None
+        if not user["is_active"]:
+            return None
+        if not _check_password(password, user["password_hash"]):
+            return None
+
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE dashboard_users SET last_login_at = NOW() WHERE id = %s",
+                (user["id"],),
+            )
+        conn.commit()
+
+        return {
+            "id": user["id"],
+            "display_name": user["display_name"],
+            "username": user["username"],
+            "role": user["role"],
+        }
+    except Exception:
+        return None
+    finally:
+        conn.close()
+
+
+def get_user_by_id(user_id: int) -> dict | None:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, display_name, username, role, is_active FROM dashboard_users WHERE id = %s",
+                (user_id,),
+            )
+            return cursor.fetchone()
+    except Exception:
+        return None
+    finally:
+        conn.close()
+
+
+def list_users() -> List[Dict[str, Any]]:
+    return _query_list(
+        "SELECT id, display_name, username, role, is_active, last_login_at, created_at FROM dashboard_users ORDER BY id ASC"
+    )
+
+
+def _username_exists(username: str) -> bool:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT 1 FROM dashboard_users WHERE username = %s",
+                (username.strip().lower(),),
+            )
+            return cursor.fetchone() is not None
+    finally:
+        conn.close()
+
+
+def create_user(
+    display_name: str,
+    username: str,
+    password: str,
+    role: str,
+    created_by_role: str,
+) -> tuple[bool, str]:
+    display_name = display_name.strip()
+    if not display_name:
+        return False, "Display name is required"
+    if len(display_name) > 100:
+        return False, "Display name must be at most 100 characters"
+
+    valid, result = _validate_username(username)
+    if not valid:
+        return False, result
+    username = result
+
+    valid, result = _validate_password(password)
+    if not valid:
+        return False, result
+
+    if role not in ("owner", "admin"):
+        return False, "Role must be 'owner' or 'admin'"
+
+    if role == "owner" and created_by_role != "owner":
+        return False, "Only owners can create owner users"
+
+    if _username_exists(username):
+        return False, "Username already exists"
+
+    password_hash = _hash_password(password)
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO dashboard_users (display_name, username, password_hash, role) VALUES (%s, %s, %s, %s)",
+                (display_name, username, password_hash, role),
+            )
+        conn.commit()
+
+        log_event(
+            "user_created",
+            f"User '{username}' ({role}) created by {created_by_role}",
+        )
+
+        return True, "User created successfully"
+    except Exception as e:
+        conn.rollback()
+        return False, f"Failed to create user: {e}"
+    finally:
+        conn.close()
+
+
+def _is_last_owner(user_id: int) -> bool:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) as cnt FROM dashboard_users WHERE role = 'owner' AND is_active = 1 AND id != %s",
+                (user_id,),
+            )
+            row = cursor.fetchone()
+            return row["cnt"] == 0
+    finally:
+        conn.close()
+
+
+def update_user(
+    user_id: int, data: dict, current_user_role: str
+) -> tuple[bool, str]:
+    target = get_user_by_id(user_id)
+    if not target:
+        return False, "User not found"
+
+    if current_user_role != "owner" and target["role"] == "owner":
+        return False, "Admins cannot modify owner users"
+
+    updates = []
+    params = []
+
+    if "display_name" in data:
+        name = data["display_name"].strip()
+        if not name:
+            return False, "Display name is required"
+        if len(name) > 100:
+            return False, "Display name must be at most 100 characters"
+        updates.append("display_name = %s")
+        params.append(name)
+
+    if "role" in data:
+        new_role = data["role"]
+        if new_role not in ("owner", "admin"):
+            return False, "Role must be 'owner' or 'admin'"
+        if current_user_role != "owner":
+            return False, "Only owners can change roles"
+        if target["role"] == "owner" and new_role != "owner":
+            if _is_last_owner(user_id):
+                return False, "Cannot demote the last owner"
+        updates.append("role = %s")
+        params.append(new_role)
+
+    if "is_active" in data:
+        is_active = bool(data["is_active"])
+        if target["role"] == "owner" and not is_active:
+            if _is_last_owner(user_id):
+                return False, "Cannot disable the last owner"
+        if current_user_role != "owner" and target["role"] == "owner":
+            return False, "Admins cannot modify owner users"
+        updates.append("is_active = %s")
+        params.append(1 if is_active else 0)
+
+    if not updates:
+        return False, "No fields to update"
+
+    params.append(user_id)
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE dashboard_users SET {', '.join(updates)} WHERE id = %s",
+                tuple(params),
+            )
+        conn.commit()
+
+        was_disabled = "is_active" in data and not bool(data["is_active"])
+        was_enabled = "is_active" in data and bool(data["is_active"])
+
+        if was_disabled:
+            log_event(
+                "user_disabled",
+                f"User '{target['username']}' disabled by {current_user_role}",
+            )
+        elif was_enabled:
+            log_event(
+                "user_enabled",
+                f"User '{target['username']}' enabled by {current_user_role}",
+            )
+
+        if "role" in data or "display_name" in data:
+            log_event(
+                "user_updated",
+                f"User '{target['username']}' updated by {current_user_role}",
+            )
+
+        return True, "User updated successfully"
+    except Exception as e:
+        conn.rollback()
+        return False, f"Failed to update user: {e}"
+    finally:
+        conn.close()
+
+
+def reset_user_password(
+    user_id: int, new_password: str, current_user_role: str
+) -> tuple[bool, str]:
+    target = get_user_by_id(user_id)
+    if not target:
+        return False, "User not found"
+
+    if current_user_role != "owner" and target["role"] == "owner":
+        return False, "Admins cannot reset owner passwords"
+
+    valid, result = _validate_password(new_password)
+    if not valid:
+        return False, result
+
+    password_hash = _hash_password(new_password)
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE dashboard_users SET password_hash = %s WHERE id = %s",
+                (password_hash, user_id),
+            )
+        conn.commit()
+
+        log_event(
+            "user_password_reset",
+            f"Password reset for user '{target['username']}' by {current_user_role}",
+        )
+
+        return True, "Password reset successfully"
+    except Exception as e:
+        conn.rollback()
+        return False, f"Failed to reset password: {e}"
+    finally:
+        conn.close()
+
+
+def delete_user(user_id: int, current_user_role: str) -> tuple[bool, str]:
+    target = get_user_by_id(user_id)
+    if not target:
+        return False, "User not found"
+
+    if current_user_role != "owner" and target["role"] == "owner":
+        return False, "Admins cannot delete owner users"
+
+    if target["role"] == "owner" and _is_last_owner(user_id):
+        return False, "Cannot delete the last owner"
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM dashboard_users WHERE id = %s", (user_id,)
+            )
+        conn.commit()
+
+        log_event(
+            "user_deleted",
+            f"User '{target['username']}' deleted by {current_user_role}",
+        )
+
+        return True, "User deleted successfully"
+    except Exception as e:
+        conn.rollback()
+        return False, f"Failed to delete user: {e}"
+    finally:
+        conn.close()
+
+
+def seed_owner() -> None:
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) as cnt FROM dashboard_users WHERE role = 'owner'"
+            )
+            row = cursor.fetchone()
+            if row and row["cnt"] > 0:
+                return
+
+        username = os.getenv("DASHBOARD_OWNER_USERNAME", "").strip().lower()
+        password = os.getenv("DASHBOARD_OWNER_PASSWORD", "")
+        display_name = os.getenv("DASHBOARD_OWNER_NAME", "").strip()
+
+        if not username or not password or not display_name:
+            print(
+                "⚠️  WARNING: No owner user exists and one or more of "
+                "DASHBOARD_OWNER_USERNAME/PASSWORD/NAME env vars are not set.\n"
+                "   Dashboard login will not be available until an owner is created.\n"
+                "   Set these environment variables and restart the server."
+            )
+            return
+
+        valid, msg = _validate_username(username)
+        if not valid:
+            print(f"⚠️  WARNING: Invalid DASHBOARD_OWNER_USERNAME: {msg}")
+            return
+
+        valid, msg = _validate_password(password)
+        if not valid:
+            print(f"⚠️  WARNING: Invalid DASHBOARD_OWNER_PASSWORD: {msg}")
+            return
+
+        if not display_name:
+            display_name = username
+
+        password_hash = _hash_password(password)
+
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO dashboard_users (display_name, username, password_hash, role) VALUES (%s, %s, %s, 'owner')",
+                (display_name, username, password_hash),
+            )
+        conn.commit()
+        print(f"✓ Owner user '{username}' created successfully")
+    except Exception as e:
+        print(f"⚠️  Failed to seed owner: {e}")
+    finally:
+        conn.close()
