@@ -13,6 +13,7 @@ SUPPORTED_EVENTS = frozenset({
     "rebuild_started",
     "rebuild_completed",
     "rebuild_failed",
+    "knowledge_added",
     "knowledge_deleted",
     "system_error",
 })

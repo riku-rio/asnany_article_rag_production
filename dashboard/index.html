@@ -195,6 +195,12 @@
   .op-btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .op-btn-danger { color: var(--badge-error-text); }
   .op-btn-danger:hover { border-color: var(--badge-error-text); color: var(--badge-error-text); }
+  .op-btn-add { background: #4caf50; color: #fff; border-color: #4caf50; white-space: nowrap; flex-shrink: 0; }
+  .op-btn-add:hover { background: #43a047; border-color: #43a047; color: #fff; }
+  .op-btn-primary { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+  .op-btn-primary:hover { opacity: 0.9; color: #fff; }
+  .modal-input { width: 100%; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-surface); color: var(--text-primary); outline: none; }
+  .modal-input:focus { border-color: var(--color-accent); }
   .op-status { font-size: 13px; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 6px; }
   .op-feedback-success { background: var(--badge-success-bg); color: var(--badge-success-text); padding: 10px 14px; border-radius: 6px; font-size: 13px; }
   .op-feedback-error { background: var(--badge-error-bg); color: var(--badge-error-text); padding: 10px 14px; border-radius: 6px; font-size: 13px; }
@@ -277,7 +283,10 @@
       <section class="section" id="section-knowledge">
         <h1 class="section-title">Knowledge</h1>
         <p class="section-desc">Browse and manage knowledge entries</p>
-        <input type="text" id="knowledgeSearch" class="knowledge-search" placeholder="Search knowledge...">
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <input type="text" id="knowledgeSearch" class="knowledge-search" style="margin-bottom:0;flex:1;" placeholder="Search knowledge...">
+          <button id="addKnowledgeBtn" class="op-btn op-btn-add">+ Add Knowledge</button>
+        </div>
         <div id="knowledgeTableContainer">
           <table class="knowledge-table" id="knowledgeTable">
             <thead>
@@ -525,6 +534,99 @@
       return '<span class="badge badge-' + (variant || 'success') + '">' + text + '</span>';
     };
 
+    /* --- Add Knowledge Modal --- */
+    window.showAddKnowledgeModal = function() {
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeModal(overlay);
+      });
+
+      var box = document.createElement('div');
+      box.className = 'modal-box';
+      box.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">' +
+          '<h2 style="margin:0;">Add Knowledge</h2>' +
+          '<button class="modal-close" style="margin-top:-4px;">&times;</button>' +
+        '</div>' +
+        '<div class="modal-body">' +
+          '<label style="display:block;font-size:14px;color:var(--text-secondary);margin-bottom:6px;">Article URL</label>' +
+          '<input type="url" id="addKnowledgeUrl" class="modal-input" placeholder="https://example.com/article" autofocus>' +
+          '<div id="addKnowledgeProgress" style="display:none;align-items:center;gap:8px;font-size:14px;color:var(--text-secondary);">' +
+            '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Processing...' +
+          '</div>' +
+        '</div>' +
+        '<div class="modal-actions" style="margin-top:16px;">' +
+          '<button id="addKnowledgeCancel" class="sidebar-item" style="width:auto;padding:6px 16px;justify-content:center;">Cancel</button>' +
+          '<button id="addKnowledgeSubmit" class="op-btn op-btn-primary" style="width:auto;padding:6px 16px;justify-content:center;">Scrape &amp; Embed</button>' +
+        '</div>';
+
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      var urlInput = box.querySelector('#addKnowledgeUrl');
+      var cancelBtn = box.querySelector('#addKnowledgeCancel');
+      var submitBtn = box.querySelector('#addKnowledgeSubmit');
+      var progressEl = box.querySelector('#addKnowledgeProgress');
+
+      box.querySelector('.modal-close').addEventListener('click', function() { closeModal(overlay); });
+      cancelBtn.addEventListener('click', function() { closeModal(overlay); });
+
+      function setLoading(loading) {
+        cancelBtn.disabled = loading;
+        submitBtn.disabled = loading;
+        urlInput.disabled = loading;
+        progressEl.style.display = loading ? 'flex' : 'none';
+      }
+
+      submitBtn.addEventListener('click', function() {
+        var url = urlInput.value.trim();
+        if (!url) {
+          showToast('Please enter a URL', 'error');
+          return;
+        }
+        setLoading(true);
+
+        fetch('/api/admin/knowledge/add-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: url })
+        })
+          .then(function(r) {
+            return r.json().then(function(data) {
+              if (!r.ok) {
+                if (data.detail) throw new Error(data.detail);
+                throw new Error('HTTP ' + r.status);
+              }
+              return data;
+            });
+          })
+          .then(function(data) {
+            if (data.success) {
+              showToast(data.message, 'success');
+              closeModal(overlay);
+              knowledgeData = [];
+              fetchKnowledge();
+              fetchOverviewStats();
+            } else {
+              showToast(data.message, 'error');
+              setLoading(false);
+            }
+          })
+          .catch(function(err) {
+            console.error('Failed to add knowledge:', err);
+            showToast(err.message || 'Failed to add knowledge', 'error');
+            setLoading(false);
+          });
+      });
+
+      urlInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { submitBtn.click(); }
+      });
+
+      setTimeout(function() { urlInput.focus(); }, 100);
+    };
+
     /* --- Knowledge Management --- */
     var knowledgeData = [];
     var knowledgeSearchEl = document.getElementById('knowledgeSearch');
@@ -607,6 +709,8 @@
         renderKnowledgeTable(filteredKnowledge());
       });
     }
+
+    document.getElementById('addKnowledgeBtn').addEventListener('click', showAddKnowledgeModal);
 
     knowledgeTableContainer.addEventListener('click', function(e) {
       var btn = e.target.closest('button');

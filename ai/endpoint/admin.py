@@ -8,6 +8,7 @@ from ai.chatbot.sql_fetch import fetch_sources_by_ids
 from ai.endpoint.chat import is_low_intent_greeting, MIN_QUERY_LENGTH
 
 from database.admin_service import (
+    add_knowledge_from_url,
     get_stats,
     list_knowledge,
     get_knowledge,
@@ -82,6 +83,12 @@ def knowledge_delete(id: int):
     if not deleted:
         raise HTTPException(status_code=404, detail="Knowledge not found")
     return {"success": True, "message": "Knowledge deleted"}
+
+
+@router.post("/knowledge/add-url")
+def knowledge_add_url(payload: Dict[str, Any]):
+    url = (payload.get("url") or "").strip()
+    return add_knowledge_from_url(url)
 
 
 @router.get("/logs")

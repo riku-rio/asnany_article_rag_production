@@ -2,6 +2,7 @@ import os
 import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 import requests
 from qdrant_client import QdrantClient, models
@@ -267,6 +268,110 @@ def delete_knowledge(article_id: int) -> bool:
 
 
 # ======================
+# Add Knowledge (single URL scrape + embed)
+# ======================
+
+def add_knowledge_from_url(url: str) -> Dict[str, Any]:
+    url = url.strip()
+    if not url:
+        return {"success": False, "message": "URL is required"}
+
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        return {"success": False, "message": "Invalid URL format"}
+    if parsed.scheme not in ("http", "https"):
+        return {"success": False, "message": "URL must start with http:// or https://"}
+
+    from database.database_server import load_known_urls_from_db
+    from scraper.asnany_scraper import normalize_url
+
+    norm_url = normalize_url(url)
+    known = load_known_urls_from_db()
+    if norm_url in known:
+        return {"success": False, "message": "Knowledge already exists"}
+
+    from scraper.asnany_scraper import scrape_article
+
+    try:
+        article = scrape_article(url)
+    except Exception as e:
+        return {"success": False, "message": f"Failed to scrape URL: {e}"}
+
+    title = (article.get("title") or "").strip()
+    content = (article.get("content") or "").strip()
+    if not title or not content:
+        return {"success": False, "message": "Scraped article has no content"}
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO blog (title, url, content) VALUES (%s, %s, %s)",
+                (title, norm_url, content),
+            )
+            article_id = cursor.lastrowid
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return {"success": False, "message": f"Failed to save article: {e}"}
+
+    if article_id is None or article_id == 0:
+        conn.close()
+        return {"success": False, "message": "Failed to save article"}
+
+    from database.embedder import chunk_text, get_model
+    from database.qdrant_uploader import upload_embeddings
+
+    try:
+        chunks = chunk_text(content)
+        if not chunks:
+            conn.close()
+            return {"success": False, "message": "No content to embed"}
+
+        model = get_model()
+        passages = []
+        meta = []
+        for idx, chunk in enumerate(chunks):
+            passages.append(f"passage: {title}\n\n{chunk}")
+            meta.append((article_id, idx, chunk))
+
+        vectors = model.encode(passages, batch_size=64, normalize_embeddings=True)
+
+        points = []
+        for (blog_id, chunk_index, chunk_body), vec in zip(meta, vectors):
+            points.append({
+                "id": f"{blog_id}_{chunk_index}",
+                "vectors": {"embedding_text": vec.tolist()},
+                "payload": {
+                    "blog_id": blog_id,
+                    "chunk_index": chunk_index,
+                    "chunk_text": chunk_body,
+                },
+            })
+
+        upload_embeddings(points)
+    except Exception as e:
+        conn.close()
+        return {"success": False, "message": f"Failed to generate embeddings: {e}"}
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("UPDATE blog SET is_embedded = 1 WHERE id = %s", (article_id,))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return {"success": False, "message": f"Failed to finalize article: {e}"}
+    finally:
+        conn.close()
+
+    log_event("knowledge_added", "Knowledge added from URL")
+
+    return {"success": True, "message": "Knowledge added successfully"}
+
+
+# ======================
 # Logs
 # ======================
 
@@ -280,6 +385,7 @@ _EVENT_LABELS = {
     "rebuild_started": "Rebuild Started",
     "rebuild_completed": "Rebuild Completed",
     "rebuild_failed": "Rebuild Failed",
+    "knowledge_added": "Knowledge Added",
     "knowledge_deleted": "Knowledge Deleted",
     "system_error": "System Error",
 }
