@@ -552,6 +552,15 @@
       return div.innerHTML;
     }
 
+    function decodeUrlForDisplay(url) {
+      if (!url) return '';
+      try {
+        return decodeURIComponent(url);
+      } catch (e) {
+        return url;
+      }
+    }
+
     function getErrorMessage(data) {
       if (!data) return 'Unknown error';
       if (data.message) return data.message;
@@ -902,7 +911,7 @@
         tr.innerHTML =
           '<td>' + item.id + '</td>' +
           '<td><span class="truncate" title="' + escapeHtml(item.title) + '">' + escapeHtml(item.title) + '</span></td>' +
-          '<td><span class="truncate" title="' + escapeHtml(item.url) + '">' + escapeHtml(item.url) + '</span></td>' +
+          '<td><span class="truncate" title="' + escapeHtml(decodeUrlForDisplay(item.url)) + '">' + escapeHtml(decodeUrlForDisplay(item.url)) + '</span></td>' +
           '<td>' + badge + '</td>' +
           '<td>' + escapeHtml(item.created_at) + '</td>' +
           '<td class="actions-cell">' +
@@ -968,7 +977,7 @@
               openModal({
                 title: escapeHtml(item.title),
                 body:
-                  '<p class="modal-url-line"><a class="modal-url" href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(item.url) + '</a></p>' +
+                  '<p class="modal-url-line"><a class="modal-url" href="' + escapeHtml(item.url) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(decodeUrlForDisplay(item.url)) + '</a></p>' +
                   '<div style="max-height:300px;overflow-y:auto;background:var(--bg-body);padding:12px;border-radius:4px;font-size:13px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;color:var(--text-primary);margin-top:8px;">' + escapeHtml(item.content) + '</div>',
                 confirmText: null,
                 cancelText: 'Close'
