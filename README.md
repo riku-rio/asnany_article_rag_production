@@ -56,25 +56,37 @@ End-to-end Retrieval-Augmented Generation (RAG) pipeline that scrapes Arabic den
 │       └──────────────────────────────────────────────────────────────────────┘
 │                                                                              │
 ├──────────────────────────────────────────────────────────────────────────────┤
-│                         ADMIN & DASHBOARD (run.py)                          │
+│                      AUTH & DASHBOARD (run.py)                            │
 │                                                                              │
 │  ┌──────────────────┐        ┌──────────────────────────────────────┐       │
-│  │  Dashboard        │───────▶│  Admin API   (/api/admin)            │       │
-│  │  (dashboard/     │        │                                      │       │
-│  │   index.html)    │        │  GET  /stats        POST /scrape     │       │
-│  │                  │        │  GET  /knowledge    POST /embedding   │       │
-│  │  • Overview      │        │  GET  /knowledge/{id} POST /rebuild  │       │
-│  │  • Knowledge     │        │  DELETE /knowledge/{id}              │       │
-│  │  • Scraper       │        │  GET  /logs         POST /chat-test  │       │
-│  │  • Embedding     │        │  GET  /health                        │       │
-│  │  • Chat Test     │        └──────┬───────────────────────────────┘       │
-│  │  • Logs          │               │                                      │
-│  │  • Health        │               ▼                                      │
-│  └──────────────────┘    ┌──────────────────────┐   ┌──────────────────┐   │
-│                          │  MySQL               │   │  Qdrant          │   │
-│                          │  (dashboard_logs,    │   │  (health check)  │   │
-│                          │   blog, chat_logs)   │   │                  │   │
-│                          └──────────────────────┘   └──────────────────┘   │
+│  │  Dashboard        │───────▶│  Auth API   (/api/admin/auth)       │       │
+│  │  (dashboard/     │        │  (public)                            │       │
+│  │   index.html)    │        │  POST /login    GET  /me            │       │
+│  │                  │        │  POST /logout                        │       │
+│  │  • Overview      │        ├──────────────────────────────────────┤       │
+│  │  • Knowledge     │        │  Admin API   (/api/admin/*)          │       │
+│  │  • Scraper       │        │  (JWT-protected with require_auth)   │       │
+│  │  • Embedding     │        │                                      │       │
+│  │  • Chat Test     │        │  GET  /stats        POST /scrape     │       │
+│  │  • Users         │        │  GET  /knowledge    POST /embedding   │       │
+│  │  • Logs          │        │  GET  /knowledge/{id} POST /rebuild  │       │
+│  │  • Health        │        │  DELETE /knowledge/{id}             │       │
+│  │                  │        │  POST /knowledge/add-url            │       │
+│  └──────────────────┘        │  GET  /logs         POST /chat-test  │       │
+│                              │  GET  /health      GET/POST /users   │       │
+│                              │  PATCH /users/{id}                  │       │
+│                              │  DELETE /users/{id}                 │       │
+│                              │  POST /users/{id}/reset-password    │       │
+│                              └──────┬───────────────────────────────┘       │
+│                                     │                                      │
+│  ┌───────────────────────┐         ▼                                      │
+│  │  Lifespan Startup     │  ┌──────────────────────┐   ┌──────────────────┐│
+│  │  (auto on boot):      │  │  MySQL               │   │  Qdrant          ││
+│  │  • Create dashboard_ │  │  (dashboard_logs,     │   │  (health check)  ││
+│  │    users table        │  │   dashboard_users,    │   │                  ││
+│  │  • Seed owner from   │  │   blog, chat_logs)    │   │                  ││
+│  │    .env               │  └──────────────────────┘   └──────────────────┘│
+│  └───────────────────────┘                                                 │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -89,10 +101,12 @@ End-to-end Retrieval-Augmented Generation (RAG) pipeline that scrapes Arabic den
 | **Qdrant Retriever** | Encodes query with `"query: {text}"` prefix, searches Qdrant for top-K most similar chunks |
 | **Groq LLM** | Generates Arabic medical answers using `openai/gpt-oss-20b` with a strict system prompt |
 | **Chat Widget** | Arabic RTL frontend with typewriter animation, health checks, and source links |
-| **Admin API** | FastAPI router (9 endpoints under `/api/admin`) for stats, knowledge CRUD, scraper/embedding control, job status, multi-component health |
-| **Admin Service** | Business logic layer — stats aggregation, Qdrant/Groq health checks, background job management with threading lock |
+| **Admin API & Auth** | Two FastAPI routers: public `auth_router` (login/logout/me) and JWT-protected `router` (19 endpoints under `/api/admin`) for stats, knowledge CRUD, scraper/embedding control, user management, job status, multi-component health |
+| **Admin Service** | Business logic layer — stats aggregation, Qdrant/Groq health checks, user CRUD with bcrypt hashing, JWT authentication, background job management with threading lock, single-URL knowledge addition |
 | **Dashboard Logger** | Writes operational events (`scraper_started`, `embedding_completed`, `system_error`, etc.) to the `dashboard_logs` MySQL table |
-| **Dashboard Frontend** | Single-file Arabic RTL admin UI with 7 tabs (Overview, Knowledge, Scraper, Embedding, Chat Test, Logs, Health), theme switching, responsive layout |
+| **Dashboard Frontend** | Single-file Arabic RTL admin UI with 8 tabs (Overview, Knowledge, Scraper, Embedding, Chat Test, Users, Logs, Health), login screen, theme switching, responsive layout |
+| **Auth System** | JWT-based session authentication with 24-hour expiry, httponly cookie, bcrypt password hashing, owner/admin roles |
+| **Dashboard Users Table** | MySQL `dashboard_users` table with `owner`/`admin` roles, auto-created and owner-seeded via lifespan handler on server startup |
 | **Migration Scripts** | One-time scripts to create `dashboard_logs` and `chat_logs` MySQL tables |
 | **Utility Scripts** | MySQL import, deduplication, diagnostics, connectivity test, and chat log verification scripts |
 
@@ -109,6 +123,8 @@ End-to-end Retrieval-Augmented Generation (RAG) pipeline that scrapes Arabic den
 | SentenceTransformers | >=5.2.2 | Local embedding model inference |
 | Groq (SDK) | >=1.0.0 | LLM API client |
 | BeautifulSoup4 | >=4.14.3 | HTML parsing for scraping |
+| bcrypt | >=4.0.0 | Password hashing for dashboard authentication |
+| pyjwt | >=2.0.0 | JWT token creation and validation for dashboard sessions |
 | Requests | >=2.32.5 | HTTP client |
 | PyMySQL | >=1.2.0 | MySQL client for article source of truth |
 | python-dotenv | >=1.2.1 | Environment variable loading |
@@ -139,12 +155,12 @@ asnany_article_rag_production/
 │   │   ├── sql_fetch.py          # Fetches article title + URL from MySQL by blog_id
 │   │   └── reply.py              # Builds context, calls Groq API, returns answer + deduped sources
 │   └── endpoint/
-│       ├── admin.py              # FastAPI admin router: /api/admin (stats, CRUD, health, background jobs)
+│       ├── admin.py              # FastAPI admin routers: auth (public) + protected /api/admin (stats, CRUD, users, health, background jobs)
 │       ├── chat.py               # FastAPI router: POST /chat/ validation, orchestration, logging
 │       └── fastapi.py            # FastAPI app factory: CORS, health check, mounts chat + admin routers, /dashboard static
 │
 ├── dashboard/                    # Admin dashboard (no build step, single HTML file)
-│   ├── index.html                # Dashboard frontend (all inline CSS/JS, 7 tabs, theme support)
+│   ├── index.html                # Dashboard frontend (all inline CSS/JS, 8 tabs, login screen, theme support)
 │   └── docs/                     # Specification documents
 │       ├── API.md                # Admin API endpoint specifications
 │       ├── DB_SCHEMA.md          # New database table specifications
@@ -163,7 +179,8 @@ asnany_article_rag_production/
 │   └── tables/
 │       ├── blog.py               # MySQL DDL: CREATE TABLE blog (articles)
 │       ├── dashboard_logs.py     # MySQL DDL: dashboard_logs (operational event log)
-│       └── chat_logs.py          # MySQL DDL: chat_logs (chat analytics)
+│       ├── chat_logs.py          # MySQL DDL: chat_logs (chat analytics)
+│       └── dashboard_users.py    # MySQL DDL: dashboard_users (auth: owner/admin roles)
 │
 ├── scraper/                      # Web scraping
 │   ├── articles.csv              # Scraped data backup (exported from MySQL at runtime — gitignored)
@@ -176,7 +193,9 @@ asnany_article_rag_production/
 │   ├── dedupe_mysql_blog_urls.py # Deduplicate tool (dry-run by default)
 │   ├── migrate_001_create_dashboard_logs.py  # Create dashboard_logs table
 │   ├── migrate_002_create_chat_logs.py       # Create chat_logs table
-│   └── verify_chat_logs.py       # Verify chat_logs insert/select/delete workflow
+│   ├── migrate_003_create_dashboard_users.py # Create dashboard_users table
+│   ├── verify_chat_logs.py       # Verify chat_logs insert/select/delete workflow
+│   └── delete_all_users.py       # Delete all dashboard users (recovery/reset tool)
 │
 ├── web/
 │   └── index.html                # Chat widget frontend (Arabic RTL, typewriter effect, source links)
@@ -231,30 +250,27 @@ Edit `.env` with your actual credentials. Every variable is documented below:
 |----------|-------------|----------|---------|
 | `GROQ_TOKEN` | Groq API key for LLM access | Yes | `gsk_abc123...` |
 | `GROQ_MODEL` | LLM model name on Groq | Yes | `openai/gpt-oss-20b` |
-| `GROQ_BASE_URL` | Groq API base URL | No | `https://api.groq.com/openai/v1` |
-| `GROQ_TIMEOUT` | HTTP request timeout (seconds) | No | `60` |
 | `GROQ_MAX_COMPLETION_TOKENS` | Max tokens for LLM response | No | `500` |
-| `GROQ_TEMPERATURE` | LLM temperature | No | `0.2` |
 | `QDRANT_TOKEN` | Qdrant Cloud API key | Yes | `eyJhbGciOi...` |
 | `QDRANT_URL` | Qdrant cluster URL | Yes | `https://xxx.us-east4-0.gcp.cloud.qdrant.io` |
 | `QDRANT_COLLECTION` | Qdrant collection name | No | `asnany_article_rag_production` |
 | `QDRANT_TIMEOUT` | Qdrant client timeout (seconds) | No | `300` |
 | `QDRANT_UPSERT_BATCH_SIZE` | Batch size for Qdrant upsert | No | `8` |
-| `QDRANT_ID_NAMESPACE` | UUIDv5 namespace for deterministic point IDs | No | `6ba7b811-9dad-11d1-80b4-00c04fd430c8` |
 | `HF_TOKEN` | HuggingFace token for gated model access | Yes | `hf_abc123...` |
 | `HF_MODEL` | SentenceTransformer embedding model | Yes | `intfloat/multilingual-e5-large` |
 | `EMBED_BATCH_SIZE` | Batch size for SentenceTransformer.encode | No | `64` |
 | `CONTEXT_MAX_CHARS` | Max characters for LLM context window | No | `10000` |
 | `ARTICLE_MAX_CHARS` | Max chars per chunk in context | No | `2000` |
 | `RETRIEVER_TOP_K` | Number of chunks to retrieve from Qdrant | No | `3` |
-| `CHUNK_SIZE` | Character chunk size for text splitting | No | `800` |
-| `CHUNK_OVERLAP` | Character overlap between chunks | No | `200` |
 | `MYSQL_HOST` | MySQL server hostname | Yes | `localhost` |
 | `MYSQL_PORT` | MySQL server port | No | `3306` |
 | `MYSQL_USER` | MySQL username | Yes | `root` |
 | `MYSQL_PASSWORD` | MySQL password | Yes | `password` |
 | `MYSQL_DATABASE` | MySQL database name | Yes | `asnany_rag` |
-| `ENABLE_CHAT_LOGS` | Toggle chat interaction logging (JSONL) | No | `true` |
+| `DASHBOARD_SECRET_KEY` | JWT signing secret for dashboard sessions | Yes | `xxx` |
+| `DASHBOARD_OWNER_USERNAME` | Default owner username seeded on first run | No | `owner` |
+| `DASHBOARD_OWNER_PASSWORD` | Default owner password for initial setup | Yes | `your-strong-password-here` |
+| `DASHBOARD_OWNER_NAME` | Display name for the seeded owner | No | `Owner` |
 
 ---
 
@@ -267,9 +283,10 @@ Run these once to create the required MySQL tables:
 ```bash
 uv run python scripts/migrate_001_create_dashboard_logs.py
 uv run python scripts/migrate_002_create_chat_logs.py
+uv run python scripts/migrate_003_create_dashboard_users.py
 ```
 
-Note: The `blog` table is auto-created by `main.py` on first run.
+Note: The `blog` table is auto-created by `main.py` on first run. The `dashboard_users` table is also auto-created (and the owner user seeded) by the FastAPI lifespan handler on server startup.
 
 ### Full data pipeline (scrape → MySQL → embed → upload)
 
@@ -291,27 +308,40 @@ This runs the following stages sequentially:
 python run.py
 ```
 
-Starts uvicorn on `0.0.0.0:8000` with hot reload. Serves everything in one process:
+Starts uvicorn on `0.0.0.0:8000` with hot reload. On startup, the lifespan handler auto-creates the `dashboard_users` MySQL table and seeds the owner user from `DASHBOARD_OWNER_*` env vars.
+
+Serves everything in one process:
 
 **Chatbot endpoints:**
 - `GET  /` — welcome message
 - `GET  /health` — health check
 - `POST /chat/` — ask a question
 
-**Admin API (see full reference below):**
-- `GET  /api/admin/stats` — dashboard summary
-- `GET  /api/admin/knowledge` — list all articles
-- `GET  /api/admin/knowledge/{id}` — article detail
+**Auth API (public):**
+- `POST /api/admin/auth/login` — login with username/password
+- `POST /api/admin/auth/logout` — logout, clear session cookie
+- `GET  /api/admin/auth/me` — return current user info
+
+**Admin API (JWT-protected — see full reference below):**
+- `GET    /api/admin/stats` — dashboard summary
+- `GET    /api/admin/knowledge` — list all articles
+- `GET    /api/admin/knowledge/{id}` — article detail
 - `DELETE /api/admin/knowledge/{id}` — delete article
-- `POST /api/admin/scrape` — trigger scraper
-- `POST /api/admin/embedding` — trigger embedding
-- `POST /api/admin/rebuild` — full rebuild
-- `GET  /api/admin/logs` — operational logs
-- `POST /api/admin/chat-test` — test chat
-- `GET  /api/admin/health` — multi-component health
+- `POST   /api/admin/knowledge/add-url` — add single article by URL
+- `POST   /api/admin/scrape` — trigger scraper
+- `POST   /api/admin/embedding` — trigger embedding
+- `POST   /api/admin/rebuild` — full rebuild
+- `GET    /api/admin/logs` — operational logs
+- `POST   /api/admin/chat-test` — test chat
+- `GET    /api/admin/health` — multi-component health
+- `GET    /api/admin/users` — list dashboard users
+- `POST   /api/admin/users` — create user
+- `PATCH  /api/admin/users/{id}` — update user
+- `DELETE /api/admin/users/{id}` — delete user
+- `POST   /api/admin/users/{id}/reset-password` — reset user password
 
 **Dashboard frontend:**
-- `GET  /dashboard` — Arabic admin dashboard UI
+- `GET  /dashboard` — Arabic admin dashboard UI (login required)
 
 ### Scraper only
 
@@ -342,8 +372,14 @@ uv run python scripts/migrate_001_create_dashboard_logs.py
 # Create chat_logs table (chat analytics)
 uv run python scripts/migrate_002_create_chat_logs.py
 
+# Create dashboard_users table (auth)
+uv run python scripts/migrate_003_create_dashboard_users.py
+
 # Verify chat_logs insert/select/delete workflow
 uv run python scripts/verify_chat_logs.py
+
+# Delete all dashboard users (interactive recovery/reset)
+uv run python scripts/delete_all_users.py
 ```
 
 ### Embedding trigger endpoint (standalone server)
@@ -462,6 +498,157 @@ curl -X POST http://localhost:8001/run-embedding
 
 ---
 
+### `POST /api/admin/auth/login`
+
+Login with username and password. Returns a JWT session cookie (httponly, 24-hour expiry).
+
+**Request Body**
+```json
+{
+  "username": "owner",
+  "password": "your-strong-password-here"
+}
+```
+
+**Response** `200 OK`
+```json
+{
+  "success": true,
+  "message": "Logged in successfully",
+  "user": {
+    "id": 1,
+    "display_name": "Owner",
+    "username": "owner",
+    "role": "owner"
+  }
+}
+```
+
+**Response** `401`
+```json
+{"success": false, "message": "Invalid username or password"}
+```
+
+---
+
+### `POST /api/admin/auth/logout`
+
+Logout and clear the session cookie.
+
+**Request Body:** None
+
+**Response** `200 OK`
+```json
+{"success": true, "message": "Logged out successfully"}
+```
+
+---
+
+### `GET /api/admin/auth/me`
+
+Return the currently authenticated user's info.
+
+**Response** `200 OK`
+```json
+{
+  "success": true,
+  "user": {
+    "id": 1,
+    "display_name": "Owner",
+    "username": "owner",
+    "role": "owner"
+  }
+}
+```
+
+---
+
+### `POST /api/admin/users`
+
+Create a new dashboard user. Requires `owner` role.
+
+**Request Body**
+```json
+{
+  "display_name": "Admin User",
+  "username": "admin1",
+  "password": "securepassword",
+  "role": "admin"
+}
+```
+
+**Response** `200 OK`
+```json
+{"success": true, "message": "User created"}
+```
+
+---
+
+### `GET /api/admin/users`
+
+List all dashboard users.
+
+**Response** `200 OK`
+```json
+{
+  "success": true,
+  "data": [
+    {"id": 1, "display_name": "Owner", "username": "owner", "role": "owner", "is_active": 1, "last_login_at": null, "created_at": "2026-06-17T12:00:00"}
+  ]
+}
+```
+
+---
+
+### `PATCH /api/admin/users/{user_id}`
+
+Update a user's fields (display_name, role, is_active). Requires `owner` role.
+
+**Request Body**
+```json
+{
+  "display_name": "New Name",
+  "role": "admin",
+  "is_active": 1
+}
+```
+
+**Response** `200 OK`
+```json
+{"success": true, "message": "User updated"}
+```
+
+---
+
+### `POST /api/admin/users/{user_id}/reset-password`
+
+Reset a user's password. Requires `owner` role.
+
+**Request Body**
+```json
+{
+  "password": "new-strong-password"
+}
+```
+
+**Response** `200 OK`
+```json
+{"success": true, "message": "Password updated"}
+```
+
+---
+
+### `DELETE /api/admin/users/{user_id}`
+
+Delete a user. The last `owner` account cannot be deleted.
+
+**Response** `200 OK`
+```json
+{"success": true, "message": "User deleted"}
+```
+
+---
+
 ### `POST /api/admin/scrape`
 
 Trigger the scraper in a background thread. Uses a threading lock to prevent concurrent maintenance jobs.
@@ -528,9 +715,9 @@ Dashboard summary statistics.
     "total_articles": 42,
     "embedded_articles": 40,
     "pending_articles": 2,
-    "total_questions": 150,
-    "last_scrape_time": "2026-06-17T10:30:00",
-    "last_embedding_time": "2026-06-17T11:00:00"
+    "questions_count": 150,
+    "last_scraping": "2026-06-17T10:30:00",
+    "last_embedding": "2026-06-17T11:00:00"
   }
 }
 ```
@@ -602,6 +789,22 @@ Delete an article and all its chunks. Removes from MySQL, Qdrant (all points wit
 
 ---
 
+### `POST /api/admin/knowledge/add-url`
+
+Add a single article by URL: scrapes the URL, chunks the content, embeds, and uploads to Qdrant atomically.
+
+**Request Body**
+```json
+{"url": "https://blog.asnany.net/..."}
+```
+
+**Response** `200 OK`
+```json
+{"success": true, "message": "Article added and embedded successfully"}
+```
+
+---
+
 ### `GET /api/admin/logs`
 
 Recent operational events from the `dashboard_logs` table.
@@ -652,17 +855,14 @@ Multi-component health check.
 **Response** `200 OK`
 ```json
 {
-  "success": true,
-  "data": {
-    "api": {"status": "ok"},
-    "mysql": {"status": "ok"},
-    "qdrant": {"status": "ok"},
-    "groq": {"status": "ok"}
-  }
+  "api": true,
+  "database": true,
+  "qdrant": true,
+  "groq": true
 }
 ```
 
-If a component is down, its `status` will be `"error"` with a `message` field.
+If a component is down, its value will be `false`.
 
 ---
 
@@ -684,8 +884,8 @@ If a component is down, its `status` will be `"error"` with a `message` field.
 4. **Retrieve** — The question is encoded with the prefix `"query: {text}"` using the same embedding model, then Qdrant searches for the top-K (default 3) most similar chunks using COSINE distance.
 5. **Fetch sources** — The unique `blog_id` values from the retrieved chunks are used to look up the article title and URL from MySQL.
 6. **Build context** — Retrieved chunks are assembled into a structured context (up to `CONTEXT_MAX_CHARS` characters) with `[CHUNK 1] TEXT: ...` markers.
-7. **Generate answer** — The system prompt, user question, and context are sent to Groq's `openai/gpt-oss-20b` model with retry logic (4 attempts, exponential backoff). The prompt instructs the LLM to answer in Arabic, use the context as its primary reference, avoid fabricating statistics, and never mention sources or URLs in the answer text.
-8. **Return** — The LLM's answer is cleaned of Arabic diacritics, deduplicated source links are appended, and the final `{reply, sources}` response is returned to the user. The interaction is logged to `chat_logs.jsonl` and the `chat_logs` MySQL table (with `response_time_ms` and `sources_count`); both can be disabled via `ENABLE_CHAT_LOGS=false`.
+7. **Generate answer** — The system prompt, user question, and context are sent to Groq's `openai/gpt-oss-20b` model with retry logic (4 attempts, exponential backoff). The prompt instructs the LLM to answer in Arabic (Modern Standard Arabic), use the context as its primary reference, prioritize meaning over literal wording, always try to answer (do not refuse unnecessarily), avoid fabricating statistics, never mention sources or URLs in the answer text, and output 3–6 short lines maximum with no headings, bullet points, markdown, or extra commentary.
+8. **Return** — The LLM's answer is cleaned of Arabic diacritics, deduplicated source links are appended, and the final `{reply, sources}` response is returned to the user. The interaction is logged to `chat_logs.jsonl` and the `chat_logs` MySQL table (with `response_time_ms` and `sources_count`).
 
 ---
 
@@ -697,10 +897,10 @@ If a component is down, its `status` will be `"error"` with a `message` field.
   - `scraper/articles.csv` — MySQL backup export
   - `.cache/` — HuggingFace model cache
 - **Dynamic API URL in frontend:** The chat widget at `web/index.html` dynamically selects the API base URL based on the hostname: `localhost`/`127.0.0.1` → `http://localhost:8000`, otherwise → `https://blog-chat.alahliadental.com`. Change the production URL to match your deployment.
-- **Dashboard authentication:** The admin dashboard at `/dashboard` and all `/api/admin` endpoints have no authentication. Add API key validation or a reverse proxy for production use.
-- **Database migrations:** New deployments must run `scripts/migrate_001_create_dashboard_logs.py` and `scripts/migrate_002_create_chat_logs.py` to create the required operational tables. The `blog` table is auto-created by `main.py`.
+- **Dashboard authentication:** The admin dashboard at `/dashboard` and all `/api/admin/*` operational endpoints require JWT-based authentication (httponly cookie, 24-hour expiry). The auth endpoints (`/api/admin/auth/login`, `/api/admin/auth/logout`, `/api/admin/auth/me`) are public. Uses bcrypt for password hashing. On first server startup, the `dashboard_users` table is auto-created and the owner user is seeded from `DASHBOARD_OWNER_*` env vars.
+- **Database migrations:** New deployments must run `scripts/migrate_001_create_dashboard_logs.py`, `scripts/migrate_002_create_chat_logs.py`, and `scripts/migrate_003_create_dashboard_users.py` to create the required operational tables. The `blog` table is auto-created by `main.py`. The `dashboard_users` table is also auto-created on FastAPI server startup.
 - **CORS:** The FastAPI server allows all origins (`allow_origins=["*"]`). Restrict this in production.
-- **No authentication:** The chat API has no authentication layer. Add API key validation or a reverse proxy for production use.
+- **No chat authentication:** The chat API endpoints (`POST /chat/`) have no authentication layer. Add API key validation or a reverse proxy for production use.
 
 ---
 
@@ -713,10 +913,7 @@ If a component is down, its `status` will be `"error"` with a `message` field.
 5. **Wide-open CORS** — `allow_origins=["*"]` allows any website to call the API.
 6. **No rate limiting** — The chat endpoint has no request rate limiting or throttling.
 7. **No caching** — Every query independently embeds the input, searches Qdrant, fetches from MySQL, and calls Groq. Repeated identical queries are processed fresh each time.
-8. **No user authentication** — The API and dashboard are fully open; there is no mechanism to identify or restrict users.
-9. **Inconsistent default values** — `QDRANT_TIMEOUT` defaults to `120` in `main.py` but `60` in `qdrant_retriever.py`.
-10. **Large model download** — The embedding model (~1.1 GB) downloads on first run, which can be slow and requires substantial disk space.
-11. **No dashboard authentication** — The admin dashboard and all `/api/admin` endpoints are fully open. Anyone with network access can view stats, delete knowledge, and trigger maintenance jobs.
+8. **Large model download** — The embedding model (~1.1 GB) downloads on first run, which can be slow and requires substantial disk space.
 
 ---
 

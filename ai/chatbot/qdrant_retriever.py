@@ -15,12 +15,12 @@ QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_TOKEN = os.getenv("QDRANT_TOKEN")
 QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION")
 
-RETRIEVER_TOP_K = int(os.getenv("RETRIEVER_TOP_K", 5))
+RETRIEVER_TOP_K = int(os.getenv("RETRIEVER_TOP_K", 3))
 
 HF_MODEL = os.getenv("HF_MODEL")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
-QDRANT_TIMEOUT = int(os.getenv("QDRANT_TIMEOUT", 60))
+QDRANT_TIMEOUT = int(os.getenv("QDRANT_TIMEOUT", 300))
 
 if not QDRANT_URL:
     raise RuntimeError("QDRANT_URL is not set in .env")

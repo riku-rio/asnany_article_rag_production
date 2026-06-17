@@ -23,8 +23,8 @@ load_dotenv()
 
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_TOKEN = os.getenv("QDRANT_TOKEN")
-QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "asnany_blog_articles")
-QDRANT_TIMEOUT = int(os.getenv("QDRANT_TIMEOUT", 120))
+QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "asnany_article_rag_production")
+QDRANT_TIMEOUT = int(os.getenv("QDRANT_TIMEOUT", 300))
 
 # ======================
 # Paths

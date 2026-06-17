@@ -26,14 +26,14 @@ GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 GROQ_TIMEOUT = int(os.getenv("GROQ_TIMEOUT", 60))
 
 # Budget
-GROQ_MAX_COMPLETION_TOKENS = int(os.getenv("GROQ_MAX_COMPLETION_TOKENS", 600))
+GROQ_MAX_COMPLETION_TOKENS = int(os.getenv("GROQ_MAX_COMPLETION_TOKENS", 500))
 GROQ_TEMPERATURE = float(os.getenv("GROQ_TEMPERATURE", 0.2))
 
 # Context safety (chars)
-CONTEXT_MAX_CHARS = int(os.getenv("CONTEXT_MAX_CHARS", 45000))
+CONTEXT_MAX_CHARS = int(os.getenv("CONTEXT_MAX_CHARS", 10000))
 
 # We reuse ARTICLE_MAX_CHARS as "per-chunk max chars" to avoid changing env names
-ARTICLE_MAX_CHARS = int(os.getenv("ARTICLE_MAX_CHARS", 15000))
+ARTICLE_MAX_CHARS = int(os.getenv("ARTICLE_MAX_CHARS", 2000))
 
 # UI strings
 READ_MORE_HEADER = "لقراءة المزيد:"
