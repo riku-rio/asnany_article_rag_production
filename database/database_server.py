@@ -1,6 +1,6 @@
 import csv
 from pathlib import Path
-from typing import Any, Dict, List, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 
 # ======================
 # Paths
@@ -207,7 +207,7 @@ def _mark_article_embedded(conn, blog_id: int) -> None:
         )
 
 
-def embed_and_upload_blog_articles() -> None:
+def embed_and_upload_blog_articles(progress_callback: Optional[Callable[..., None]] = None) -> None:
     """
     Incremental pipeline:
     - Embed ONLY articles where is_embedded = 0
@@ -237,13 +237,20 @@ def embed_and_upload_blog_articles() -> None:
                 "No new embeddings to process",
                 conn=conn,
             )
+            if progress_callback:
+                progress_callback(progress=100, message="No new content to process", total_items=0, completed_items=0, log="No new content to process")
             return
 
         # 2) Group by blog_id so we can mark per article after successful upload
         grouped = _group_points_by_blog_id(points)
         blog_ids = list(grouped.keys())
+        total_to_upload = len(blog_ids)
 
-        print(f"📦 Articles to upload: {len(blog_ids)}")
+        if progress_callback:
+            progress_callback(log=f"Found {len(points)} chunks across {total_to_upload} articles")
+            progress_callback(log="Uploading to AI search index...")
+
+        print(f"📦 Articles to upload: {total_to_upload}")
         # Ensure table exists (safe)
         create_blog_table(conn)
 
@@ -261,7 +268,14 @@ def embed_and_upload_blog_articles() -> None:
             conn.commit()
 
             uploaded_articles += 1
-            print(f"✅ Marked embedded: blog_id={blog_id} ({uploaded_articles}/{len(blog_ids)})")
+            print(f"✅ Marked embedded: blog_id={blog_id} ({uploaded_articles}/{total_to_upload})")
+
+            if progress_callback:
+                pct = min(int((uploaded_articles / total_to_upload) * 90), 90)
+                progress_callback(progress=pct, message=f"Processed {uploaded_articles} / {total_to_upload}", completed_items=uploaded_articles, log=f"Processed {uploaded_articles} / {total_to_upload}")
+
+        if progress_callback:
+            progress_callback(progress=95, message="Updated AI search index", log="Updated AI search index")
 
         print("🚀 Blog embeddings pipeline completed")
         log_event(
@@ -270,10 +284,15 @@ def embed_and_upload_blog_articles() -> None:
             conn=conn,
         )
 
+        if progress_callback:
+            progress_callback(progress=100, message="Content processing completed", total_items=total_to_upload, completed_items=uploaded_articles, log="Content processing completed")
+
     except Exception as e:
         conn.rollback()
         print("❌ Embeddings pipeline failed — rollback SQL marking")
         log_event("embedding_failed", str(e), conn=conn)
+        if progress_callback:
+            progress_callback(log=f"Error: {e}")
         raise
 
     finally:

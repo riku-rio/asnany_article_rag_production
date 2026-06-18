@@ -1,8 +1,9 @@
 import os
 import re
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from urllib.parse import urlparse
 
 import bcrypt
@@ -17,12 +18,120 @@ from database.qdrant_uploader import QDRANT_COLLECTION
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CSV_PATH = PROJECT_ROOT / "scraper" / "articles.csv"
 
-_job_lock = threading.Lock()
-_job_running = False
-
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_TOKEN = os.getenv("QDRANT_TOKEN")
 GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+
+# ======================
+# Per-job status system
+# ======================
+
+_JOB_INIT = {
+    "scrape": {"type": "scrape", "status": "idle", "progress": 0, "message": "", "logs": [], "started_at": None, "finished_at": None, "error": None, "total_items": 0, "completed_items": 0},
+    "embedding": {"type": "embedding", "status": "idle", "progress": 0, "message": "", "logs": [], "started_at": None, "finished_at": None, "error": None, "total_items": 0, "completed_items": 0},
+    "rebuild": {"type": "rebuild", "status": "idle", "progress": 0, "message": "", "logs": [], "started_at": None, "finished_at": None, "error": None, "total_items": 0, "completed_items": 0},
+}
+
+_job_statuses: Dict[str, Dict[str, Any]] = {k: dict(v) for k, v in _JOB_INIT.items()}
+_jobs_lock = threading.Lock()
+
+
+def get_job_status(job_type: str) -> Dict[str, Any]:
+    with _jobs_lock:
+        status = _job_statuses.get(job_type)
+        if not status:
+            init = _JOB_INIT.get(job_type, {"type": job_type, "status": "idle", "progress": 0, "message": "", "logs": [], "started_at": None, "finished_at": None, "error": None, "total_items": 0, "completed_items": 0})
+            return dict(init)
+        # Return a copy so callers don't modify internal state
+        return {
+            "type": status["type"],
+            "status": status["status"],
+            "progress": status["progress"],
+            "message": status["message"],
+            "logs": list(status["logs"]),
+            "started_at": status["started_at"],
+            "finished_at": status["finished_at"],
+            "error": status["error"],
+            "total_items": status.get("total_items", 0),
+            "completed_items": status.get("completed_items", 0),
+        }
+
+
+def _init_job(job_type: str) -> None:
+    with _jobs_lock:
+        _job_statuses[job_type] = {
+            "type": job_type,
+            "status": "running",
+            "progress": 0,
+            "message": "",
+            "logs": [{"timestamp": datetime.now(timezone.utc).isoformat(), "message": "Starting..."}],
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "finished_at": None,
+            "error": None,
+            "total_items": 0,
+            "completed_items": 0,
+        }
+
+
+def _update_job_progress(job_type: str, progress: int, message: str = "") -> None:
+    with _jobs_lock:
+        s = _job_statuses.get(job_type)
+        if s and s["status"] == "running":
+            s["progress"] = min(progress, 100)
+            if message:
+                s["message"] = message
+
+
+def _add_job_log(job_type: str, log_line: str) -> None:
+    with _jobs_lock:
+        s = _job_statuses.get(job_type)
+        if s and s["status"] == "running":
+            s["logs"].append({"timestamp": datetime.now(timezone.utc).isoformat(), "message": log_line})
+
+
+def _finish_job(job_type: str, success: bool = True, error: str = "") -> None:
+    with _jobs_lock:
+        s = _job_statuses.get(job_type)
+        if s and s["status"] == "running":
+            s["status"] = "success" if success else "error"
+            s["progress"] = 100
+            s["finished_at"] = datetime.now(timezone.utc).isoformat()
+            if error:
+                s["error"] = error
+                s["logs"].append({"timestamp": s["finished_at"], "message": f"Error: {error}"})
+            else:
+                s["logs"].append({"timestamp": s["finished_at"], "message": "Completed"})
+
+
+def _update_job_items(job_type: str, *, total_items: Optional[int] = None, completed_items: Optional[int] = None) -> None:
+    with _jobs_lock:
+        s = _job_statuses.get(job_type)
+        if s and s["status"] == "running":
+            if total_items is not None:
+                s["total_items"] = total_items
+            if completed_items is not None:
+                s["completed_items"] = completed_items
+
+
+def _update_job_message(job_type: str, message: str) -> None:
+    with _jobs_lock:
+        s = _job_statuses.get(job_type)
+        if s and s["status"] == "running" and message:
+            s["message"] = message
+
+
+def _make_job_callback(job_type: str) -> Callable:
+    """Return a callback (progress, message, log, total_items, completed_items) for background jobs."""
+    def cb(*, progress: Optional[int] = None, message: str = "", log: str = "", total_items: Optional[int] = None, completed_items: Optional[int] = None) -> None:
+        if progress is not None:
+            _update_job_progress(job_type, progress, message)
+        elif message:
+            _update_job_message(job_type, message)
+        if log:
+            _add_job_log(job_type, log)
+        if total_items is not None or completed_items is not None:
+            _update_job_items(job_type, total_items=total_items, completed_items=completed_items)
+    return cb
 
 _qdrant_client: Optional[QdrantClient] = None
 
@@ -74,27 +183,36 @@ def _query_list(sql: str, params: tuple = ()) -> List[Dict[str, Any]]:
 # Background job helpers
 # ======================
 
-def _run_background(target_func):
-    global _job_running
+_JOB_RUNNING_FLAGS: Dict[str, threading.Lock] = {
+    "scrape": threading.Lock(),
+    "embedding": threading.Lock(),
+    "rebuild": threading.Lock(),
+}
+
+
+def _start_job(job_type: str, target_func: Callable) -> Dict[str, Any]:
+    lock = _JOB_RUNNING_FLAGS[job_type]
+    if not lock.acquire(blocking=False):
+        return {"status": "busy", "message": f"This operation is already running"}
+    try:
+        _init_job(job_type)
+        thread = threading.Thread(target=lambda: _run_job(job_type, target_func), daemon=True)
+        thread.start()
+        return {"success": True, "message": "Job started in background"}
+    except Exception:
+        lock.release()
+        raise
+
+
+def _run_job(job_type: str, target_func: Callable) -> None:
+    lock = _JOB_RUNNING_FLAGS[job_type]
     try:
         target_func()
     except Exception as e:
-        print(f"Background job failed: {e}")
+        print(f"Background job {job_type} failed: {e}")
+        _finish_job(job_type, success=False, error=str(e))
     finally:
-        _job_running = False
-        _job_lock.release()
-
-
-def _start_background_job(target_func):
-    global _job_running
-    if _job_running:
-        return {"status": "busy", "message": "A maintenance job is already running"}
-    if not _job_lock.acquire(blocking=False):
-        return {"status": "busy", "message": "A maintenance job is already running"}
-    _job_running = True
-    thread = threading.Thread(target=lambda: _run_background(target_func), daemon=True)
-    thread.start()
-    return {"status": "started", "message": "Job started in background"}
+        lock.release()
 
 
 def _reset_all_is_embedded():
@@ -123,7 +241,11 @@ def run_scraper():
         from scraper.asnany_scraper import scrape_all_articles
 
         try:
+            cb = _make_job_callback("scrape")
+            cb(progress=5, message="Checking pages...", log="Starting content import...")
             known_urls = load_known_urls_from_db()
+            cb(log=f"Found {len(known_urls)} existing articles")
+
             scrape_all_articles(
                 known_urls,
                 csv_path=CSV_PATH,
@@ -131,13 +253,15 @@ def run_scraper():
                 sleep_seconds=0.3,
                 on_article=insert_blog_article,
                 write_csv=False,
+                progress_callback=cb,
             )
             log_event("scraper_completed", "Scraper completed successfully")
+            _finish_job("scrape", success=True)
         except Exception as e:
             log_event("scraper_failed", f"Scraper failed: {e}")
-            raise
+            _finish_job("scrape", success=False, error=str(e))
 
-    return _start_background_job(_scrape)
+    return _start_job("scrape", _scrape)
 
 
 # ======================
@@ -151,16 +275,34 @@ def run_embedding():
             export_blog_to_csv,
         )
 
-        log_event("embedding_started", "Embedding triggered from dashboard")
         try:
+            cb = _make_job_callback("embedding")
+            log_event("embedding_started", "Embedding triggered from dashboard")
+
+            cb(log="Counting pending content items...")
+            pending = _query_scalar("SELECT COUNT(*) FROM blog WHERE is_embedded = 0") or 0
+
+            if pending == 0:
+                cb(progress=100, message="No new content to process", total_items=0, completed_items=0, log="No new content to process")
+                log_event("embedding_completed", "No new content to process")
+                _finish_job("embedding", success=True)
+                return
+
+            cb(progress=0, message=f"Processing 0 / {pending} items", total_items=pending, completed_items=0, log=f"Found {pending} pending content items")
+
+            cb(log="Backing up content to CSV...")
             export_blog_to_csv(CSV_PATH)
-            embed_and_upload_blog_articles()
+
+            cb(log="Processing content...")
+            embed_and_upload_blog_articles(progress_callback=cb)
+
             log_event("embedding_completed", "Embedding completed successfully")
+            _finish_job("embedding", success=True)
         except Exception as e:
             log_event("embedding_failed", f"Embedding failed: {e}")
-            raise
+            _finish_job("embedding", success=False, error=str(e))
 
-    return _start_background_job(_embed)
+    return _start_job("embedding", _embed)
 
 
 # ======================
@@ -171,16 +313,33 @@ def rebuild_everything():
     def _rebuild():
         from database.database_server import embed_and_upload_blog_articles
 
-        log_event("rebuild_started", "Rebuild triggered from dashboard")
         try:
+            cb = _make_job_callback("rebuild")
+            log_event("rebuild_started", "Rebuild triggered from dashboard")
+
+            total = _query_scalar("SELECT COUNT(*) FROM blog") or 0
+
+            cb(progress=5, message="Resetting processed content...", total_items=total, completed_items=0, log=f"Reset {total} content items...")
             _reset_all_is_embedded()
-            embed_and_upload_blog_articles()
+
+            cb(progress=10, message="Clearing AI search index...", log="Clearing AI search index...")
+
+            if total == 0:
+                cb(progress=100, message="No content to rebuild", log="No content to rebuild")
+                log_event("rebuild_completed", "No content to rebuild")
+                _finish_job("rebuild", success=True)
+                return
+
+            cb(progress=10, message=f"Reprocessing 0 / {total} items", total_items=total, completed_items=0, log="Reprocessing content...")
+            embed_and_upload_blog_articles(progress_callback=cb)
+
             log_event("rebuild_completed", "Rebuild completed successfully")
+            _finish_job("rebuild", success=True)
         except Exception as e:
             log_event("rebuild_failed", f"Rebuild failed: {e}")
-            raise
+            _finish_job("rebuild", success=False, error=str(e))
 
-    return _start_background_job(_rebuild)
+    return _start_job("rebuild", _rebuild)
 
 
 # ======================

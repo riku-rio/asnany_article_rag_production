@@ -1,7 +1,7 @@
 import csv
 import time
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Set, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Union
 from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode, unquote, quote
 
 import requests
@@ -221,6 +221,7 @@ def scrape_all_articles(
     sleep_seconds: float = 0.3,
     on_article: Optional[Callable[[Dict[str, str]], None]] = None,
     write_csv: bool = True,
+    progress_callback: Optional[Callable[..., None]] = None,
 ) -> int:
     """
     Incremental scraping:
@@ -241,6 +242,8 @@ def scrape_all_articles(
 
     new_count = 0
     page = 1
+    skipped_count = 0
+    all_links_count = 0
 
     log_event(
         "scraper_started",
@@ -258,55 +261,78 @@ def scrape_all_articles(
         except requests.HTTPError as e:
             status = e.response.status_code if e.response is not None else None
             if status == 404:
-                # Normal end-of-pages for WordPress pagination — not a failure
                 print(f"📭 Page {page} returned 404, no more pages.")
+                if progress_callback:
+                    progress_callback(log="No more pages found.")
                 break
             print(f"⛔ Page {page} HTTP error {status}: {e}")
             log_event("scraper_failed", f"Page {page} HTTP error {status}: {e}")
+            if progress_callback:
+                progress_callback(log=f"HTTP error on page {page}: {status}")
             break
         except requests.RequestException as e:
             print(f"⛔ Failed to fetch page {page}: {e}")
             log_event("scraper_failed", f"Failed to fetch page {page}: {e}")
+            if progress_callback:
+                progress_callback(log=f"Failed to fetch page {page}")
             break
 
         if not links:
             print(f"📭 No articles found on page {page}, stopping.")
+            if progress_callback:
+                progress_callback(log="No articles found, stopping.")
             break
 
-        for link in links:
+        all_links_count += len(links)
+
+        if progress_callback:
+            processed = new_count + skipped_count
+            progress_callback(log=f"Found {len(links)} articles on page {page}", total_items=all_links_count, completed_items=processed)
+
+        for idx, link in enumerate(links):
             norm = normalize_url(link)
             if not norm:
                 continue
 
-            # ✅ Decision BEFORE scraping the article page
             if norm in known_urls:
+                skipped_count += 1
+                if progress_callback:
+                    progress_callback(log=f"Skipped duplicate: {link}", total_items=all_links_count, completed_items=new_count + skipped_count)
                 continue
 
             try:
                 print(f"   → Scraping {link}")
                 article = scrape_article(link)
 
-                # Store the normalized URL in known_urls to avoid duplicates in same run
+                title = article.get("title", "").strip()
                 known_urls.add(norm)
 
-                # Write to CSV if enabled (legacy/standalone mode)
                 if write_csv:
                     append_article_to_csv(csv_path, article)
 
-                # Call the on_article callback if provided (production: insert_blog_article)
                 if on_article is not None:
                     on_article(article)
 
                 new_count += 1
+
+                if progress_callback:
+                    progress_callback(log=f"Imported: {title or link}", total_items=all_links_count, completed_items=new_count + skipped_count)
+
                 time.sleep(sleep_seconds)
 
             except Exception as e:
                 print(f"❌ Failed {link}: {e}")
+                if progress_callback:
+                    progress_callback(log=f"Failed: {link} — {e}", total_items=all_links_count, completed_items=new_count + skipped_count)
 
         page += 1
 
     print(f"\n✅ New articles processed: {new_count}")
     log_event("scraper_completed", f"Scraping completed, {new_count} new articles")
+
+    if progress_callback:
+        progress_callback(progress=100, message=f"Content import completed ({new_count} new articles)", total_items=all_links_count, completed_items=new_count + skipped_count, log=f"Content import completed ({new_count} new articles)")
+
     return new_count
 
 

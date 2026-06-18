@@ -19,6 +19,7 @@ from database.admin_service import (
     create_user,
     delete_knowledge,
     delete_user,
+    get_job_status,
     get_knowledge,
     get_logs,
     get_stats,
@@ -306,6 +307,17 @@ def embedding():
 def rebuild():
     try:
         return rebuild_everything()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/jobs/{job_type}/status")
+def job_status(job_type: str):
+    valid = {"scrape", "embedding", "rebuild"}
+    if job_type not in valid:
+        raise HTTPException(status_code=404, detail=f"Unknown job type '{job_type}'")
+    try:
+        return get_job_status(job_type)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

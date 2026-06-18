@@ -229,6 +229,30 @@
   .modal-select { width: 100%; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--bg-surface); color: var(--text-primary); outline: none; }
   .modal-select:focus { border-color: var(--color-accent); }
   .op-status { font-size: 13px; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 6px; }
+
+  .job-progress-container { margin-top: 12px; }
+  .job-progress-label { font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+  .job-progress-track { height: 8px; background: var(--border-color); border-radius: 4px; overflow: hidden; }
+  .job-progress-bar { height: 100%; background: var(--color-accent); border-radius: 4px; transition: width 0.4s ease; width: 0%; }
+  .job-progress-bar.success { background: #4caf50; }
+  .job-progress-bar.error { background: #f44336; }
+  .job-progress-pct { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+  .job-progress-items { font-size: 13px; color: var(--text-secondary); margin-top: 6px; }
+
+  .job-console { margin-top: 12px; background: #0d0d1a; border: 1px solid #2a2a44; border-radius: 6px; padding: 10px; max-height: 200px; overflow-y: auto; font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #e0e0e0; line-height: 1.6; }
+  .job-console::-webkit-scrollbar { width: 6px; }
+  .job-console::-webkit-scrollbar-track { background: transparent; }
+  .job-console::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+  .job-console-line { white-space: pre-wrap; overflow-wrap: break-word; }
+  .job-console-line::before { content: '> '; color: #8888aa; }
+  .job-console-line.info { color: #81c784; }
+  .job-console-line.info::before { content: '> '; color: #81c784; }
+  .job-console-line.warn { color: #ffb74d; }
+  .job-console-line.warn::before { content: '! '; color: #ffb74d; }
+  .job-console-line.error { color: #ef9a9a; }
+  .job-console-line.error::before { content: '! '; color: #ef9a9a; }
+
+  .job-console-empty { color: #6666aa; font-style: italic; }
   .op-feedback-success { background: var(--badge-success-bg); color: var(--badge-success-text); padding: 10px 14px; border-radius: 6px; font-size: 13px; }
   .op-feedback-error { background: var(--badge-error-bg); color: var(--badge-error-text); padding: 10px 14px; border-radius: 6px; font-size: 13px; }
 
@@ -378,7 +402,17 @@
           <button id="runScraperBtn" class="op-btn">&#9654; Import Content</button>
           <span id="scraperStatus" class="op-status"></span>
         </div>
-        <div id="scraperFeedback" class="card" style="display:none;"></div>
+        <div id="scraperProgressCard" class="card" style="display:none;">
+          <div class="job-progress-container">
+            <div class="job-progress-label" id="scraperProgressLabel">Starting...</div>
+            <div class="job-progress-track">
+              <div class="job-progress-bar" id="scraperProgressBar"></div>
+            </div>
+            <div class="job-progress-pct" id="scraperProgressPct">0%</div>
+            <div class="job-progress-items" id="scraperProgressItems"></div>
+          </div>
+          <div class="job-console" id="scraperConsole"></div>
+        </div>
       </section>
 
       <section class="section" id="section-embedding">
@@ -393,7 +427,17 @@
           <button id="rebuildBtn" class="op-btn op-btn-danger">&#9888; Rebuild Processed Content</button>
           <span id="embeddingStatus" class="op-status"></span>
         </div>
-        <div id="embeddingFeedback" class="card" style="display:none;"></div>
+        <div id="embeddingProgressCard" class="card" style="display:none;">
+          <div class="job-progress-container">
+            <div class="job-progress-label" id="embeddingProgressLabel">Starting...</div>
+            <div class="job-progress-track">
+              <div class="job-progress-bar" id="embeddingProgressBar"></div>
+            </div>
+            <div class="job-progress-pct" id="embeddingProgressPct">0%</div>
+            <div class="job-progress-items" id="embeddingProgressItems"></div>
+          </div>
+          <div class="job-console" id="embeddingConsole"></div>
+        </div>
       </section>
 
       <section class="section" id="section-chat-test">
@@ -1019,19 +1063,106 @@
       });
     }
 
-    /* --- Scraper Controls --- */
-    var scraperBtn, scraperStatus, scraperFeedback;
+    /* --- Shared Job Polling --- */
+    function startJobPolling(jobType, progressCardId, progressBarId, progressLabelId, progressPctId, progressItemsId, consoleId, statusEl, buttons, onDone) {
+      var progressCard = document.getElementById(progressCardId);
+      var progressBar = document.getElementById(progressBarId);
+      var progressLabel = document.getElementById(progressLabelId);
+      var progressPct = document.getElementById(progressPctId);
+      var progressItems = document.getElementById(progressItemsId);
+      var consoleEl = document.getElementById(consoleId);
+      var polling = true;
 
-    function showScraperFeedback(message, type) {
-      scraperFeedback.style.display = 'block';
-      scraperFeedback.className = 'card op-feedback-' + type;
-      scraperFeedback.textContent = message;
+      function updateUI(status) {
+        var pct = status.progress || 0;
+        progressBar.style.width = pct + '%';
+        progressBar.className = 'job-progress-bar';
+        if (status.status === 'success') progressBar.classList.add('success');
+        else if (status.status === 'error') progressBar.classList.add('error');
+        progressPct.textContent = pct + '%';
+        progressLabel.textContent = status.message || status.status;
+
+        if (progressItems) {
+          var ti = status.total_items;
+          var ci = status.completed_items;
+          if (ti > 0 && ci >= 0) {
+            progressItems.textContent = ci + ' / ' + ti + ' items';
+          } else {
+            progressItems.textContent = '';
+          }
+        }
+
+        if (status.logs && status.logs.length > 0) {
+          consoleEl.innerHTML = '';
+          var hasLines = false;
+          status.logs.forEach(function(log) {
+            var msg = (log.message || '').trim();
+            if (!msg) return;
+            hasLines = true;
+            var line = document.createElement('div');
+            line.className = 'job-console-line';
+            if (msg.toLowerCase().indexOf('error') !== -1 || msg.toLowerCase().indexOf('fail') !== -1) {
+              line.classList.add('error');
+            } else if (msg.toLowerCase().indexOf('skip') !== -1) {
+              line.classList.add('warn');
+            } else {
+              line.classList.add('info');
+            }
+            line.textContent = msg;
+            consoleEl.appendChild(line);
+          });
+          if (!hasLines) {
+            consoleEl.innerHTML = '<div class="job-console-empty">Waiting for logs...</div>';
+          }
+          consoleEl.scrollTop = consoleEl.scrollHeight;
+        } else {
+          consoleEl.innerHTML = '<div class="job-console-empty">Waiting for logs...</div>';
+        }
+      }
+
+      function poll() {
+        if (!polling) return;
+        fetch('/api/admin/jobs/' + jobType + '/status')
+          .then(function(r) { return r.ok ? r.json() : null; })
+          .then(function(status) {
+            if (!status) { stopPolling('error'); return; }
+            updateUI(status);
+            if (status.status === 'success' || status.status === 'error') {
+              stopPolling(status.status);
+            }
+          })
+          .catch(function() {
+            stopPolling('error');
+          });
+      }
+
+      function stopPolling(finalStatus) {
+        polling = false;
+        buttons.forEach(function(b) { b.disabled = false; });
+        if (statusEl) statusEl.textContent = '';
+        if (finalStatus === 'success') {
+          showToast(jobType === 'scrape' ? 'Content import completed' : jobType === 'embedding' ? 'Content processing completed' : 'Rebuild completed', 'success');
+        } else if (finalStatus === 'error') {
+          showToast(jobType === 'scrape' ? 'Content import failed' : jobType === 'embedding' ? 'Content processing failed' : 'Rebuild failed', 'error');
+        }
+        onDone();
+      }
+
+      progressCard.style.display = 'block';
+      updateUI({ progress: 0, status: 'running', message: 'Starting...', logs: [] });
+      poll();
+      var interval = setInterval(function() {
+        if (!polling) { clearInterval(interval); return; }
+        poll();
+      }, 1000);
     }
+
+    /* --- Scraper Controls --- */
+    var scraperBtn, scraperStatus;
 
     function runScraper() {
       scraperBtn.disabled = true;
-      scraperStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Running...';
-      scraperFeedback.style.display = 'none';
+      scraperStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Starting...';
       fetch('/api/admin/scrape', { method: 'POST' })
         .then(function(r) {
           if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1039,40 +1170,45 @@
         })
         .then(function(data) {
           if (data.status === 'busy') {
-            showScraperFeedback(data.message, 'error');
-            showToast(data.message, 'error');
-          } else {
-            showScraperFeedback(data.message, 'success');
-            showToast('Content import started', 'success');
+            scraperBtn.disabled = false;
+            scraperStatus.textContent = '';
+            showToast('A content import is already running', 'error');
+            return;
           }
-          updateLastRunTimes();
-          fetchLogs();
+          showToast('Content import started', 'success');
+          startJobPolling(
+            'scrape',
+            'scraperProgressCard',
+            'scraperProgressBar',
+            'scraperProgressLabel',
+            'scraperProgressPct',
+            'scraperProgressItems',
+            'scraperConsole',
+            scraperStatus,
+            [scraperBtn],
+            function() {
+              updateLastRunTimes();
+              fetchOverviewStats();
+              fetchLogs();
+              knowledgeData = [];
+            }
+          );
         })
         .catch(function(err) {
-          showScraperFeedback('Failed to start content import', 'error');
-          showToast('Failed to start content import', 'error');
-        })
-        .finally(function() {
           scraperBtn.disabled = false;
           scraperStatus.textContent = '';
+          showToast('Failed to start content import: ' + err.message, 'error');
         });
     }
 
     function bindScraper() {
       scraperBtn = document.getElementById('runScraperBtn');
       scraperStatus = document.getElementById('scraperStatus');
-      scraperFeedback = document.getElementById('scraperFeedback');
       if (scraperBtn) scraperBtn.addEventListener('click', runScraper);
     }
 
     /* --- Embedding Controls --- */
-    var embeddingBtn, rebuildBtn, embeddingStatus, embeddingFeedback;
-
-    function showEmbeddingFeedback(message, type) {
-      embeddingFeedback.style.display = 'block';
-      embeddingFeedback.className = 'card op-feedback-' + type;
-      embeddingFeedback.textContent = message;
-    }
+    var embeddingBtn, rebuildBtn, embeddingStatus;
 
     function setEmbeddingButtons(disabled) {
       embeddingBtn.disabled = disabled;
@@ -1081,8 +1217,7 @@
 
     function runEmbedding() {
       setEmbeddingButtons(true);
-      embeddingStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Running...';
-      embeddingFeedback.style.display = 'none';
+      embeddingStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Starting...';
       fetch('/api/admin/embedding', { method: 'POST' })
         .then(function(r) {
           if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1090,22 +1225,34 @@
         })
         .then(function(data) {
           if (data.status === 'busy') {
-            showEmbeddingFeedback(data.message, 'error');
-            showToast(data.message, 'error');
-          } else {
-            showEmbeddingFeedback(data.message, 'success');
-            showToast('Content processing started', 'success');
+            setEmbeddingButtons(false);
+            embeddingStatus.textContent = '';
+            showToast('Content processing is already running', 'error');
+            return;
           }
-          updateLastRunTimes();
-          fetchLogs();
+          showToast('Content processing started', 'success');
+          startJobPolling(
+            'embedding',
+            'embeddingProgressCard',
+            'embeddingProgressBar',
+            'embeddingProgressLabel',
+            'embeddingProgressPct',
+            'embeddingProgressItems',
+            'embeddingConsole',
+            embeddingStatus,
+            [embeddingBtn, rebuildBtn],
+            function() {
+              updateLastRunTimes();
+              fetchOverviewStats();
+              fetchLogs();
+              knowledgeData = [];
+            }
+          );
         })
         .catch(function(err) {
-          showEmbeddingFeedback('Failed to process content', 'error');
-          showToast('Failed to process content', 'error');
-        })
-        .finally(function() {
           setEmbeddingButtons(false);
           embeddingStatus.textContent = '';
+          showToast('Failed to start content processing: ' + err.message, 'error');
         });
     }
 
@@ -1117,8 +1264,7 @@
         cancelText: 'Cancel',
         onConfirm: function() {
           setEmbeddingButtons(true);
-          embeddingStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Rebuilding...';
-          embeddingFeedback.style.display = 'none';
+          embeddingStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Starting...';
           fetch('/api/admin/rebuild', { method: 'POST' })
             .then(function(r) {
               if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1126,22 +1272,34 @@
             })
             .then(function(data) {
               if (data.status === 'busy') {
-                showEmbeddingFeedback(data.message, 'error');
-                showToast(data.message, 'error');
-              } else {
-              showEmbeddingFeedback(data.message, 'success');
+                setEmbeddingButtons(false);
+                embeddingStatus.textContent = '';
+                showToast('A rebuild is already running', 'error');
+                return;
+              }
               showToast('Rebuild started', 'success');
-            }
-            updateLastRunTimes();
-            fetchLogs();
-          })
-          .catch(function(err) {
-            showEmbeddingFeedback('Failed to rebuild processed content', 'error');
-            showToast('Failed to rebuild processed content', 'error');
+              startJobPolling(
+                'rebuild',
+                'embeddingProgressCard',
+                'embeddingProgressBar',
+                'embeddingProgressLabel',
+                'embeddingProgressPct',
+                'embeddingProgressItems',
+                'embeddingConsole',
+                embeddingStatus,
+                [embeddingBtn, rebuildBtn],
+                function() {
+                  updateLastRunTimes();
+                  fetchOverviewStats();
+                  fetchLogs();
+                  knowledgeData = [];
+                }
+              );
             })
-            .finally(function() {
+            .catch(function(err) {
               setEmbeddingButtons(false);
               embeddingStatus.textContent = '';
+              showToast('Failed to start rebuild: ' + err.message, 'error');
             });
         }
       });
@@ -1151,7 +1309,6 @@
       embeddingBtn = document.getElementById('runEmbeddingBtn');
       rebuildBtn = document.getElementById('rebuildBtn');
       embeddingStatus = document.getElementById('embeddingStatus');
-      embeddingFeedback = document.getElementById('embeddingFeedback');
       if (embeddingBtn) embeddingBtn.addEventListener('click', runEmbedding);
       if (rebuildBtn) rebuildBtn.addEventListener('click', rebuildEverything);
     }
