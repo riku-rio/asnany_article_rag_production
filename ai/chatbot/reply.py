@@ -35,11 +35,22 @@ CONTEXT_MAX_CHARS = int(os.getenv("CONTEXT_MAX_CHARS", 10000))
 # We reuse ARTICLE_MAX_CHARS as "per-chunk max chars" to avoid changing env names
 ARTICLE_MAX_CHARS = int(os.getenv("ARTICLE_MAX_CHARS", 2000))
 
+def _lang_reply(query: str, arabic_text: str, english_text: str) -> str:
+    """Return arabic_text if query contains Arabic characters, else english_text."""
+    return arabic_text if re.search(r'[\u0600-\u06FF]', query or "") else english_text
+
+
 # UI strings
 READ_MORE_HEADER = "لقراءة المزيد:"
-FALLBACK_TEXT = "لا أستطيع الإجابة من المعلومات المتاحة."
-DAILY_LIMIT_MESSAGE = "تم استهلاك الحد المتاح للاستخدام حاليًا. يرجى المحاولة لاحقًا."
-TRANSIENT_ERROR_MESSAGE = "حصلت مشكلة مؤقتة في الخدمة. حاول مرة أخرى بعد قليل."
+FALLBACK_TEXT_AR = "لا أستطيع الإجابة من المعلومات المتاحة."
+FALLBACK_TEXT_EN = "I'm unable to answer from the available information."
+DAILY_LIMIT_AR = "تم استهلاك الحد المتاح للاستخدام حاليًا. يرجى المحاولة لاحقًا."
+DAILY_LIMIT_EN = "The daily usage limit has been reached. Please try again later."
+TRANSIENT_ERROR_AR = "حصلت مشكلة مؤقتة في الخدمة. حاول مرة أخرى بعد قليل."
+TRANSIENT_ERROR_EN = "A temporary service error occurred. Please try again shortly."
+
+# Keep a default FALLBACK_TEXT constant for backward-compatible import in chat.py
+FALLBACK_TEXT = FALLBACK_TEXT_AR
 
 # ======================
 # Prompt Path (required)
@@ -231,6 +242,9 @@ def _call_groq_chat(
     if not GROQ_MODEL:
         raise RuntimeError("GROQ_MODEL is not set in .env")
 
+    _daily_limit_msg = _lang_reply(user_message, DAILY_LIMIT_AR, DAILY_LIMIT_EN)
+    _transient_error_msg = _lang_reply(user_message, TRANSIENT_ERROR_AR, TRANSIENT_ERROR_EN)
+
     url = f"{GROQ_BASE_URL.rstrip('/')}/chat/completions"
     headers = {
         "Authorization": f"Bearer {GROQ_TOKEN}",
@@ -265,14 +279,14 @@ def _call_groq_chat(
                 time.sleep(0.6 * attempt)
                 continue
             print(f"⚠️ Groq transient failure: {last_err_text}")
-            return TRANSIENT_ERROR_MESSAGE
+            return _transient_error_msg
 
         # Success
         if resp.status_code == 200:
             data = _safe_json(resp)
             if not isinstance(data, dict):
                 print(f"⚠️ Groq returned non-JSON: {resp.text[:800]}")
-                return TRANSIENT_ERROR_MESSAGE
+                return _transient_error_msg
 
             try:
                 content = data["choices"][0]["message"]["content"]
@@ -298,7 +312,7 @@ def _call_groq_chat(
         if resp.status_code == 429:
             if _looks_like_quota_error(err_lower):
                 print(f"⚠️ Groq quota exhausted: {last_err_text}")
-                return DAILY_LIMIT_MESSAGE
+                return _daily_limit_msg
 
             retry_after = resp.headers.get("retry-after")
             if attempt < max_attempts:
@@ -312,7 +326,7 @@ def _call_groq_chat(
                 continue
 
             print(f"⚠️ Groq rate limit: {last_err_text}")
-            return TRANSIENT_ERROR_MESSAGE
+            return _transient_error_msg
 
         if resp.status_code in transient_statuses:
             if attempt < max_attempts:
@@ -325,7 +339,7 @@ def _call_groq_chat(
         raise RuntimeError(f"Groq API error ({resp.status_code}): {err_text}")
 
     print(f"⚠️ Groq unknown failure: {last_err_text}")
-    return TRANSIENT_ERROR_MESSAGE
+    return _transient_error_msg
 
 
 def generate_reply(
@@ -387,6 +401,15 @@ def generate_reply(
     # ======================
     system_prompt = _load_system_prompt()
 
+    # Detect user language: if the query contains Arabic characters, respond in Arabic;
+    # otherwise respond in English.
+    _has_arabic = bool(re.search(r'[\u0600-\u06FF]', user_query))
+    _answer_instruction = (
+        "أجب بالعربية بشكل واضح ومباشر:"
+        if _has_arabic
+        else "Answer clearly and directly in English:"
+    )
+
     user_message = (
         "<question>\n"
         f"{user_query.strip()}\n"
@@ -394,7 +417,7 @@ def generate_reply(
         "<context>\n"
         f"{context}\n"
         "</context>\n\n"
-        "أجب بالعربية بشكل واضح ومباشر:"
+        f"{_answer_instruction}"
     )
 
     # ======================
@@ -408,7 +431,7 @@ def generate_reply(
     )
 
     if not answer:
-        answer = FALLBACK_TEXT
+        answer = _lang_reply(user_query, FALLBACK_TEXT_AR, FALLBACK_TEXT_EN)
 
     answer = _clean_text(answer)
 

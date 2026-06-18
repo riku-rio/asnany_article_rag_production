@@ -217,20 +217,27 @@ def chat_endpoint(payload: ChatRequest) -> Dict[str, Any]:
             detail="query cannot be empty",
         )
 
+    # Detect user language once — reused by all early-exit replies below.
+    _query_has_arabic = bool(re.search(r'[\u0600-\u06FF]', query))
+
     # 1️⃣ Greeting handler — runs BEFORE short-query rejection so that
     #    short greetings like "hi" are answered gracefully.
     if is_low_intent_greeting(query):
-        return {
-            "reply": "مرحبًا بك 👋 يمكنك سؤالي عن أي موضوع يخص الأسئلة الطبية وسأحاول مساعدتك.",
-            "sources": []
-        }
+        _greeting_reply = (
+            "مرحبًا بك 👋 يمكنك سؤالي عن أي موضوع يخص الأسئلة الطبية وسأحاول مساعدتك."
+            if _query_has_arabic
+            else "Welcome! 👋 Feel free to ask me any medical question and I'll do my best to help."
+        )
+        return {"reply": _greeting_reply, "sources": []}
 
     # 2️⃣ Reject very short meaningless inputs
     if len(query) < MIN_QUERY_LENGTH:
-        return {
-            "reply": "يرجى كتابة سؤال واضح يتعلق بالمجال الطبي 😊",
-            "sources": []
-        }
+        _short_reply = (
+            "يرجى كتابة سؤال واضح يتعلق بالمجال الطبي 😊"
+            if _query_has_arabic
+            else "Please write a clear medical question 😊"
+        )
+        return {"reply": _short_reply, "sources": []}
 
     # 3️⃣ Retrieve chunks from Qdrant
     try:
@@ -242,10 +249,12 @@ def chat_endpoint(payload: ChatRequest) -> Dict[str, Any]:
         )
 
     if not hits:
-        return {
-            "reply": "يمكنني مساعدتك في الأسئلة المتعلقة بالمواضيع الطبية فقط 😊",
-            "sources": []
-        }
+        _no_results_reply = (
+            "يمكنني مساعدتك في الأسئلة المتعلقة بالمواضيع الطبية فقط 😊"
+            if _query_has_arabic
+            else "I can only help with medical and dental questions 😊"
+        )
+        return {"reply": _no_results_reply, "sources": []}
 
     # 4️⃣ Extract chunk_text + blog_ids
     chunks: List[str] = []
