@@ -289,65 +289,65 @@
   <div class="body">
     <nav class="sidebar" id="sidebar">
       <button class="sidebar-item active" data-tab="overview">
-        <span class="sidebar-icon">&#9632;</span>
-        <span>Overview</span>
+        <span class="sidebar-icon">🏠</span>
+        <span>Home</span>
       </button>
       <button class="sidebar-item" data-tab="knowledge">
-        <span class="sidebar-icon">&#9776;</span>
-        <span>Knowledge</span>
+        <span class="sidebar-icon">📚</span>
+        <span>Content Library</span>
       </button>
       <button class="sidebar-item" data-tab="scraper">
-        <span class="sidebar-icon">&#8595;</span>
-        <span>Scraper</span>
+        <span class="sidebar-icon">📥</span>
+        <span>Import Content</span>
       </button>
       <button class="sidebar-item" data-tab="embedding">
-        <span class="sidebar-icon">&#9851;</span>
-        <span>Embedding</span>
+        <span class="sidebar-icon">⚙️</span>
+        <span>Process Content</span>
       </button>
       <button class="sidebar-item" data-tab="chat-test">
-        <span class="sidebar-icon">&#9993;</span>
-        <span>Chat Test</span>
+        <span class="sidebar-icon">💬</span>
+        <span>Test Assistant</span>
       </button>
       <button class="sidebar-item" data-tab="users">
-        <span class="sidebar-icon">&#9737;</span>
-        <span>Users</span>
+        <span class="sidebar-icon">👥</span>
+        <span>Team</span>
       </button>
       <button class="sidebar-item" data-tab="logs">
-        <span class="sidebar-icon">&#9776;</span>
-        <span>Logs</span>
+        <span class="sidebar-icon">📋</span>
+        <span>Activity History</span>
       </button>
       <button class="sidebar-item" data-tab="health">
-        <span class="sidebar-icon">&#10003;</span>
-        <span>Health</span>
+        <span class="sidebar-icon">🟢</span>
+        <span>System Status</span>
       </button>
     </nav>
 
     <main class="content" id="content">
       <section class="section active" id="section-overview">
-        <h1 class="section-title">Overview</h1>
-        <p class="section-desc">System summary at a glance</p>
+        <h1 class="section-title">Home</h1>
+        <p class="section-desc">Quick overview of your AI assistant and content status</p>
         <div class="kpi-row">
           <div class="kpi-card"><div class="kpi-label">Total Content</div><div class="kpi-value" id="overviewTotalContent">--</div></div>
-          <div class="kpi-card"><div class="kpi-label">Embedded</div><div class="kpi-value" id="overviewEmbedded">--</div></div>
-          <div class="kpi-card"><div class="kpi-label">Pending</div><div class="kpi-value" id="overviewPending">--</div></div>
+          <div class="kpi-card"><div class="kpi-label">Ready for AI</div><div class="kpi-value" id="overviewEmbedded">--</div></div>
+          <div class="kpi-card"><div class="kpi-label">Needs Update</div><div class="kpi-value" id="overviewPending">--</div></div>
           <div class="kpi-card"><div class="kpi-label">Questions</div><div class="kpi-value" id="overviewQuestions">--</div></div>
         </div>
         <div class="card">
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-            <div><div style="font-size:13px;color:var(--text-secondary);">Last Scraping</div><div style="font-weight:500;margin-top:2px;" id="overviewLastScraping">--</div></div>
-            <div><div style="font-size:13px;color:var(--text-secondary);">Last Embedding</div><div style="font-weight:500;margin-top:2px;" id="overviewLastEmbedding">--</div></div>
-            <div><div style="font-size:13px;color:var(--text-secondary);">Database</div><div style="font-weight:500;margin-top:2px;" id="overviewDatabase">--</div></div>
-            <div><div style="font-size:13px;color:var(--text-secondary);">Qdrant</div><div style="font-weight:500;margin-top:2px;" id="overviewQdrant">--</div></div>
+            <div><div style="font-size:13px;color:var(--text-secondary);">Last Import</div><div style="font-weight:500;margin-top:2px;" id="overviewLastScraping">--</div></div>
+            <div><div style="font-size:13px;color:var(--text-secondary);">Last Processing</div><div style="font-weight:500;margin-top:2px;" id="overviewLastEmbedding">--</div></div>
+            <div><div style="font-size:13px;color:var(--text-secondary);">Content Database</div><div style="font-weight:500;margin-top:2px;" id="overviewDatabase">--</div></div>
+            <div><div style="font-size:13px;color:var(--text-secondary);">AI Search Engine</div><div style="font-weight:500;margin-top:2px;" id="overviewQdrant">--</div></div>
           </div>
         </div>
       </section>
 
       <section class="section" id="section-knowledge">
-        <h1 class="section-title">Knowledge</h1>
-        <p class="section-desc">Browse and manage knowledge entries</p>
+        <h1 class="section-title">Content Library</h1>
+        <p class="section-desc">Browse, search, add, view, and delete content used by the AI assistant</p>
         <div style="display:flex;gap:8px;margin-bottom:16px;">
-          <input type="text" id="knowledgeSearch" class="knowledge-search" style="margin-bottom:0;flex:1;" placeholder="Search knowledge...">
-          <button id="addKnowledgeBtn" class="op-btn op-btn-add">+ Add Knowledge</button>
+          <input type="text" id="knowledgeSearch" class="knowledge-search" style="margin-bottom:0;flex:1;" placeholder="Search content...">
+          <button id="addKnowledgeBtn" class="op-btn op-btn-add">+ Add Content</button>
         </div>
         <div id="knowledgeTableContainer">
           <table class="knowledge-table" id="knowledgeTable">
@@ -356,52 +356,52 @@
                 <th>ID</th>
                 <th>Title</th>
                 <th>URL</th>
-                <th>Embedded</th>
+                <th>Status</th>
                 <th>Created At</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="knowledgeTableBody"></tbody>
           </table>
-          <div id="knowledgeEmpty" class="empty-state" style="display:none;">No knowledge entries found</div>
+          <div id="knowledgeEmpty" class="empty-state" style="display:none;">No content found</div>
         </div>
       </section>
 
       <section class="section" id="section-scraper">
-        <h1 class="section-title">Scraper</h1>
-        <p class="section-desc">Trigger article scraping</p>
+        <h1 class="section-title">Import Content</h1>
+        <p class="section-desc">Import or refresh content from configured sources</p>
         <div class="card">
-          <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">Last Scraping</div>
+          <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">Last Import</div>
           <div id="scraperLastRun" style="font-weight:500;">--</div>
         </div>
         <div class="card" style="display:flex;align-items:center;gap:16px;">
-          <button id="runScraperBtn" class="op-btn">&#9654; Run Scraper</button>
+          <button id="runScraperBtn" class="op-btn">&#9654; Import Content</button>
           <span id="scraperStatus" class="op-status"></span>
         </div>
         <div id="scraperFeedback" class="card" style="display:none;"></div>
       </section>
 
       <section class="section" id="section-embedding">
-        <h1 class="section-title">Embedding</h1>
-        <p class="section-desc">Manage vector indexing</p>
+        <h1 class="section-title">Process Content</h1>
+        <p class="section-desc">Prepare imported content so the AI assistant can use it</p>
         <div class="card">
-          <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">Last Embedding</div>
+          <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">Last Processing</div>
           <div id="embeddingLastRun" style="font-weight:500;">--</div>
         </div>
         <div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-          <button id="runEmbeddingBtn" class="op-btn">&#9654; Run Embedding</button>
-          <button id="rebuildBtn" class="op-btn op-btn-danger">&#9888; Rebuild Everything</button>
+          <button id="runEmbeddingBtn" class="op-btn">&#9654; Process Content</button>
+          <button id="rebuildBtn" class="op-btn op-btn-danger">&#9888; Rebuild Processed Content</button>
           <span id="embeddingStatus" class="op-status"></span>
         </div>
         <div id="embeddingFeedback" class="card" style="display:none;"></div>
       </section>
 
       <section class="section" id="section-chat-test">
-        <h1 class="section-title">Chat Test</h1>
-        <p class="section-desc">Test the AI chatbot</p>
+        <h1 class="section-title">Test Assistant</h1>
+        <p class="section-desc">Ask questions and test how the AI assistant responds</p>
 
         <div class="card" style="display:flex;flex-direction:column;gap:12px;">
-          <textarea id="chatQuery" rows="4" placeholder="Type your question in Arabic or English..."></textarea>
+          <textarea id="chatQuery" rows="4" placeholder="Type a question for the AI assistant..."></textarea>
           <div style="display:flex;align-items:center;gap:12px;">
             <button id="askBtn" class="op-btn">&#9654; Ask</button>
             <span id="chatStatus" class="op-status"></span>
@@ -420,8 +420,8 @@
       </section>
 
       <section class="section" id="section-users">
-        <h1 class="section-title">Users</h1>
-        <p class="section-desc">Manage dashboard users</p>
+        <h1 class="section-title">Team</h1>
+        <p class="section-desc">Manage dashboard users and access</p>
         <div style="display:flex;gap:8px;margin-bottom:16px;">
           <button id="addUserBtn" class="op-btn op-btn-add">+ Add User</button>
           <span id="usersStatus" class="op-status"></span>
@@ -446,8 +446,8 @@
       </section>
 
       <section class="section" id="section-logs">
-        <h1 class="section-title">Logs</h1>
-        <p class="section-desc">System activity log</p>
+        <h1 class="section-title">Activity History</h1>
+        <p class="section-desc">Recent dashboard and system activity</p>
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
           <button id="refreshLogsBtn" class="op-btn">&#x21bb; Refresh</button>
           <span id="logsStatus" class="op-status"></span>
@@ -459,13 +459,13 @@
             </thead>
             <tbody id="logsTableBody"></tbody>
           </table>
-          <div id="logsEmpty" class="empty-state" style="display:none;">No log entries yet</div>
+          <div id="logsEmpty" class="empty-state" style="display:none;">No activity yet</div>
         </div>
       </section>
 
       <section class="section" id="section-health">
-        <h1 class="section-title">Health</h1>
-        <p class="section-desc">System component status</p>
+        <h1 class="section-title">System Status</h1>
+        <p class="section-desc">Check whether the system services are running correctly</p>
         <button id="refreshHealthBtn" class="op-btn" style="margin-bottom:16px;">&#x21bb; Refresh</button>
         <div id="healthCards" class="kpi-row"></div>
       </section>
@@ -800,19 +800,19 @@
       box.className = 'modal-box';
       box.innerHTML =
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">' +
-          '<h2 style="margin:0;">Add Knowledge</h2>' +
+          '<h2 style="margin:0;">Add Content</h2>' +
           '<button class="modal-close" style="margin-top:-4px;">&times;</button>' +
         '</div>' +
         '<div class="modal-body">' +
-          '<label style="display:block;font-size:14px;color:var(--text-secondary);margin-bottom:6px;">Article URL</label>' +
+          '<label style="display:block;font-size:14px;color:var(--text-secondary);margin-bottom:6px;">Content URL</label>' +
           '<input type="url" id="addKnowledgeUrl" class="modal-input" placeholder="https://example.com/article" autofocus>' +
           '<div id="addKnowledgeProgress" style="display:none;align-items:center;gap:8px;font-size:14px;color:var(--text-secondary);margin-top:12px;">' +
-            '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Processing...' +
+            '<span class="spinner" style="width:16px;height:16px;border-width:2px;"></span> Adding and preparing content...' +
           '</div>' +
         '</div>' +
         '<div class="modal-actions" style="margin-top:16px;">' +
           '<button id="addKnowledgeCancel" class="sidebar-item" style="width:auto;padding:6px 16px;justify-content:center;">Cancel</button>' +
-          '<button id="addKnowledgeSubmit" class="op-btn op-btn-primary" style="width:auto;padding:6px 16px;justify-content:center;">Scrape &amp; Embed</button>' +
+          '<button id="addKnowledgeSubmit" class="op-btn op-btn-primary" style="width:auto;padding:6px 16px;justify-content:center;">Add Content</button>' +
         '</div>';
 
       overlay.appendChild(box);
@@ -864,7 +864,7 @@
             }
           })
           .catch(function(err) {
-            showToast(err.message || 'Failed to add knowledge', 'error');
+            showToast(err.message || 'Failed to add content', 'error');
             setLoading(false);
           });
       });
@@ -904,7 +904,7 @@
       tbody.innerHTML = '';
       data.forEach(function(item) {
         var badge = item.is_embedded === 1
-          ? createBadge('Embedded', 'success')
+          ? createBadge('Processed', 'success')
           : createBadge('Pending', 'warning');
         var tr = document.createElement('tr');
         tr.dataset.id = item.id;
@@ -938,7 +938,7 @@
           renderKnowledgeTable(filteredKnowledge());
         })
         .catch(function(err) {
-          showToast('Failed to load knowledge entries', 'error');
+          showToast('Failed to load content', 'error');
         })
         .finally(function() {
           hideSpinner(spinner);
@@ -963,7 +963,7 @@
         if (btn.classList.contains('view-btn')) {
           var loadingOverlay = openModal({
             title: 'Loading...',
-            body: '<p>Loading knowledge details...</p>',
+            body: '<p>Loading content details...</p>',
             cancelText: null,
             confirmText: null
           });
@@ -985,14 +985,14 @@
             })
             .catch(function(err) {
               closeModal(loadingOverlay);
-              showToast('Failed to load knowledge details', 'error');
+              showToast('Failed to load content details', 'error');
             });
         }
 
         if (btn.classList.contains('delete-btn')) {
           openModal({
             title: 'Confirm Delete',
-            body: '<p>Are you sure you want to delete this knowledge entry? This action cannot be undone.</p>',
+            body: '<p>Are you sure you want to delete this content item? This action cannot be undone.</p>',
             confirmText: 'Delete',
             cancelText: 'Cancel',
             onConfirm: function() {
@@ -1003,12 +1003,12 @@
                   return r.json();
                 })
                 .then(function() {
-                  showToast('Knowledge entry deleted', 'success');
+                  showToast('Content item deleted', 'success');
                   knowledgeData = [];
                   fetchKnowledge();
                 })
                 .catch(function(err) {
-                  showToast('Failed to delete knowledge entry', 'error');
+                  showToast('Failed to delete content item', 'error');
                 })
                 .finally(function() {
                   hideSpinner(delSpinner);
@@ -1043,14 +1043,14 @@
             showToast(data.message, 'error');
           } else {
             showScraperFeedback(data.message, 'success');
-            showToast('Scraper started', 'success');
+            showToast('Content import started', 'success');
           }
           updateLastRunTimes();
           fetchLogs();
         })
         .catch(function(err) {
-          showScraperFeedback('Failed to start scraper', 'error');
-          showToast('Failed to start scraper', 'error');
+          showScraperFeedback('Failed to start content import', 'error');
+          showToast('Failed to start content import', 'error');
         })
         .finally(function() {
           scraperBtn.disabled = false;
@@ -1094,14 +1094,14 @@
             showToast(data.message, 'error');
           } else {
             showEmbeddingFeedback(data.message, 'success');
-            showToast('Embedding started', 'success');
+            showToast('Content processing started', 'success');
           }
           updateLastRunTimes();
           fetchLogs();
         })
         .catch(function(err) {
-          showEmbeddingFeedback('Failed to start embedding', 'error');
-          showToast('Failed to start embedding', 'error');
+          showEmbeddingFeedback('Failed to process content', 'error');
+          showToast('Failed to process content', 'error');
         })
         .finally(function() {
           setEmbeddingButtons(false);
@@ -1112,7 +1112,7 @@
     function rebuildEverything() {
       openModal({
         title: 'Confirm Rebuild',
-        body: '<p>This will reset all embeddings and rebuild from scratch. This operation cannot be undone. Continue?</p>',
+        body: '<p>This will reset processed content and rebuild it from scratch. This operation cannot be undone. Continue?</p>',
         confirmText: 'Rebuild',
         cancelText: 'Cancel',
         onConfirm: function() {
@@ -1129,15 +1129,15 @@
                 showEmbeddingFeedback(data.message, 'error');
                 showToast(data.message, 'error');
               } else {
-                showEmbeddingFeedback(data.message, 'success');
-                showToast('Rebuild started', 'success');
-              }
-              updateLastRunTimes();
-              fetchLogs();
-            })
-            .catch(function(err) {
-              showEmbeddingFeedback('Failed to start rebuild', 'error');
-              showToast('Failed to start rebuild', 'error');
+              showEmbeddingFeedback(data.message, 'success');
+              showToast('Rebuild started', 'success');
+            }
+            updateLastRunTimes();
+            fetchLogs();
+          })
+          .catch(function(err) {
+            showEmbeddingFeedback('Failed to rebuild processed content', 'error');
+            showToast('Failed to rebuild processed content', 'error');
             })
             .finally(function() {
               setEmbeddingButtons(false);
@@ -1234,10 +1234,10 @@
         })
         .then(function(data) {
           var components = [
-            { name: 'API', status: data.api },
-            { name: 'Database', status: data.database },
-            { name: 'Qdrant', status: data.qdrant },
-            { name: 'Groq', status: data.groq }
+            { name: 'Dashboard Service', status: data.api },
+            { name: 'Content Database', status: data.database },
+            { name: 'AI Search Engine', status: data.qdrant },
+            { name: 'AI Model Service', status: data.groq }
           ];
           var html = '';
           components.forEach(function(c) {
