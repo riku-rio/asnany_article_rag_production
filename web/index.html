@@ -231,6 +231,49 @@
   align-self: flex-start;
 }
 
+#empty-state {
+  margin: auto;
+  text-align: center;
+  color: #565656;
+  max-width: 280px;
+}
+
+.empty-icon {
+  font-size: 42px;
+  margin-bottom: 10px;
+}
+
+#empty-state h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: #333;
+}
+
+#empty-state p {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.suggestions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.suggestions button {
+  border: 1px solid #72AC34;
+  background: #f7fbf3;
+  color: #72AC34;
+  border-radius: 999px;
+  padding: 8px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: normal;
+  line-height: 1.4;
+}
+
   /* ======================
      MOBILE OPTIMIZATION
   ====================== */
@@ -279,13 +322,25 @@
   </div>
 
   <!-- CHAT -->
-  <div id="chat-messages" class="hidden"></div>
+<div id="chat-messages" class="hidden">
+  <div id="empty-state">
+    <div class="empty-icon">🤖</div>
+    <h3>مرحبًا بك / Welcome</h3>
+    <p>اسأل عن صحة أسنانك<br>Ask about your dental health</p>
 
-  <form id="chat-form" class="hidden">
-    <input type="text" id="chat-input" placeholder="اكتب سؤالك / Ask your question" />
-    <button type="submit">Send</button>
-  </form>
+    <div class="suggestions">
+      <button type="button">ما سبب ألم الأسنان؟</button>
+      <button type="button">كيف أحافظ على أسناني؟</button>
+      <button type="button">Why do my gums bleed?</button>
+      <button type="button">How can I stop tooth pain?</button>
+    </div>
+  </div>
 </div>
+
+<form id="chat-form" class="hidden">
+  <input type="text" id="chat-input" placeholder="اكتب سؤالك / Ask your question" />
+  <button type="submit">Send</button>
+</form>
 
 <script>
 const toggleBtn = document.getElementById("chat-toggle");
@@ -348,6 +403,13 @@ document.addEventListener("DOMContentLoaded", function () {
         });
       });
     });
+  }
+});
+
+document.addEventListener("click", function (e) {
+  if (e.target.closest(".suggestions button")) {
+    input.value = e.target.textContent.trim();
+    input.focus();
   }
 });
 
@@ -426,6 +488,9 @@ async function checkServerHealth() {
 }
 
 function addMessage(text, type) {
+  const emptyState = document.getElementById("empty-state");
+  if (emptyState) emptyState.remove();
+
   const div = document.createElement("div");
   div.className = `message ${type}`;
   div.textContent = text;
